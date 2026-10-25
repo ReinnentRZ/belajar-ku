@@ -1,0 +1,55 @@
+{
+  "name": "belajar-ku-api",
+  "version": "1.0.0",
+  "description": "Production-ready Modular Monolith REST API for tutoring marketplace platform Belajar-Ku",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "rimraf dist && tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "prisma db seed",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "test:e2e": "tsx scripts/test-e2e-flow.ts",
+    "frontend:install": "npm --prefix frontend install",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:start": "npm --prefix frontend run start",
+    "frontend:clean": "docker compose exec frontend sh -c \"rm -rf /app/.next/* /app/.next/.[!.]*\" && docker compose restart frontend"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "keywords": [
+    "fastify",
+    "prisma",
+    "redis",
+    "modular-monolith",
+    "tutoring",
+    "marketplace"
+  ],
+  "author": "Belajar-Ku Engineering Team",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/jwt": "^9.0.4",
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^5.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "ioredis": "^5.4.2",
+    "prisma": "^5.22.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^22.10.2",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

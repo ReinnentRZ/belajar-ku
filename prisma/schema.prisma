@@ -1,0 +1,323 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PARENT
+  TUTOR
+  ADMIN
+}
+
+enum GradeLevel {
+  PAUD
+  TK
+  SD
+  SMP
+}
+
+enum TeachingMode {
+  ONLINE
+  OFFLINE_VISIT
+}
+
+enum OrderStatus {
+  WAITING_PAYMENT
+  PAID
+  CANCELLED
+  EXPIRED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+  DISPUTED
+}
+
+enum MutationType {
+  CREDIT_FROM_SESSION
+  WITHDRAWAL
+}
+
+enum ReportReason {
+  TUTOR_NO_SHOW
+  PARENT_NO_SHOW
+  INAPPROPRIATE_BEHAVIOR
+  POOR_QUALITY
+  TECHNICAL_ISSUE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  INVESTIGATING
+  RESOLVED
+  REJECTED
+}
+
+enum AdminAction {
+  REFUND_TO_PARENT
+  RELEASE_FUNDS_TO_TUTOR
+  SUSPEND_USER
+  REJECT_REPORT
+}
+
+model User {
+  id           String          @id @default(uuid())
+  name         String
+  email        String          @unique
+  phone        String
+  passwordHash String
+  role         Role            @default(PARENT)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  tutorProfile    TutorProfile?
+  studentProfiles StudentProfile[]
+  cart            Cart?
+  orders          Order[]
+  sessionReports  SessionReport[] @relation("ReportedByUser")
+  resolvedReports SessionReport[] @relation("ResolvedByAdmin")
+
+  @@map("users")
+}
+
+model TutorProfile {
+  id            String              @id @default(uuid())
+  userId        String              @unique
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio           String
+  education     String
+  address       String
+  isVerified    Boolean             @default(false)
+  walletBalance Float               @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  services        TutorService[]
+  availabilities  TutorAvailability[]
+  orderItems              OrderItem[]
+  bookingSessions         BookingSession[]
+  walletMutations         WalletMutation[]
+  platformRevenueLedgers  PlatformRevenueLedger[]
+
+  @@map("tutor_profiles")
+}
+
+model StudentProfile {
+  id            String         @id @default(uuid())
+  parentId      String
+  parent        User           @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  studentName   String
+  gradeLevel    GradeLevel
+  learningNotes String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  bookingSessions BookingSession[]
+
+  @@map("student_profiles")
+}
+
+model Category {
+  id          String         @id @default(uuid())
+  name        String
+  targetGrade GradeLevel
+  slug        String         @unique
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  services TutorService[]
+
+  @@map("categories")
+}
+
+model TutorService {
+  id              String       @id @default(uuid())
+  tutorId         String
+  tutor           TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        Category     @relation(fields: [categoryId], references: [id])
+  title           String
+  teachingMode    TeachingMode
+  durationMinutes Int
+  sessionCount    Int          @default(1)
+  price           Float
+  description     String
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@map("tutor_services")
+}
+
+model TutorAvailability {
+  id        String       @id @default(uuid())
+  tutorId   String
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  dayOfWeek Int          // 1 (Monday) to 7 (Sunday)
+  startTime String       // Format HH:mm
+  endTime   String       // Format HH:mm
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("tutor_availabilities")
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  parentId  String     @unique
+  parent    User       @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id              String         @id @default(uuid())
+  cartId          String
+  cart            Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         TutorService   @relation(fields: [serviceId], references: [id])
+  studentId       String
+  student         StudentProfile @relation(fields: [studentId], references: [id])
+  selectedSlots   Json           // Array of { date: string, startTime: string, endTime: string }
+  teachingAddress String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@map("cart_items")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  invoiceNumber String      @unique
+  parentId      String
+  parent        User        @relation(fields: [parentId], references: [id])
+  totalAmount   Float
+  status        OrderStatus @default(WAITING_PAYMENT)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items                  OrderItem[]
+  platformRevenueLedgers PlatformRevenueLedger[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                    String         @id @default(uuid())
+  orderId               String
+  order                 Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceId             String
+  service               TutorService   @relation(fields: [serviceId], references: [id])
+  tutorId               String
+  tutor                 TutorProfile   @relation(fields: [tutorId], references: [id])
+  studentId             String
+  student               StudentProfile @relation(fields: [studentId], references: [id])
+  priceSnapshot         Float
+  platformFeePercent    Decimal        @default(15.00) @db.Decimal(5, 2)
+  totalSessions         Int
+  completedSessions     Int            @default(0)
+  selectedSlotsSnapshot Json
+  teachingAddress       String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  bookingSessions BookingSession[]
+
+  @@map("order_items")
+}
+
+model BookingSession {
+  id             String         @id @default(uuid())
+  orderItemId    String
+  orderItem      OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  tutorId        String
+  tutor          TutorProfile   @relation(fields: [tutorId], references: [id])
+  studentId      String
+  student        StudentProfile @relation(fields: [studentId], references: [id])
+  sessionNumber  Int
+  scheduledDate  DateTime
+  startTime      String         // Format HH:mm
+  endTime        String         // Format HH:mm
+  status         SessionStatus  @default(SCHEDULED)
+  learningReport String?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  walletMutation         WalletMutation?
+  platformRevenueLedger  PlatformRevenueLedger?
+  sessionReports         SessionReport[]
+
+  @@map("booking_sessions")
+}
+
+model WalletMutation {
+  id          String          @id @default(uuid())
+  tutorId     String
+  tutor       TutorProfile    @relation(fields: [tutorId], references: [id])
+  sessionId   String?         @unique
+  session     BookingSession? @relation(fields: [sessionId], references: [id])
+  type        MutationType
+  grossAmount Float           @default(0)
+  feeDeducted Float           @default(0)
+  netAmount   Float           @default(0)
+  amount      Float
+  createdAt   DateTime        @default(now())
+
+  @@map("wallet_mutations")
+}
+
+model PlatformRevenueLedger {
+  id          String         @id @default(uuid())
+  orderId     String
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionId   String         @unique
+  session     BookingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tutorId     String
+  tutor       TutorProfile   @relation(fields: [tutorId], references: [id])
+  grossAmount Float
+  platformFee Float
+  createdAt   DateTime       @default(now())
+
+  @@map("platform_revenue_ledgers")
+}
+
+model SessionReport {
+  id           String         @id @default(uuid())
+  sessionId    String
+  session      BookingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reporterId   String
+  reporter     User           @relation("ReportedByUser", fields: [reporterId], references: [id])
+  reason       ReportReason
+  description  String
+  evidenceUrl  String?
+  status       ReportStatus   @default(PENDING)
+  adminNotes   String?
+  actionTaken  AdminAction?
+  resolvedById String?
+  resolvedBy   User?          @relation("ResolvedByAdmin", fields: [resolvedById], references: [id])
+  resolvedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("session_reports")
+}

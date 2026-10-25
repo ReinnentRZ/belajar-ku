@@ -1,4 +1,122 @@
+# ==============================================================================
+# Belajar-Ku Monorepo .gitignore
+# Production-ready Git ignore rules for Backend (Node/Fastify) & Frontend (Next.js)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Dependencies & Package Managers
+# ------------------------------------------------------------------------------
 node_modules/
+*/node_modules/
+.pnp/
+.pnp.js
+
+# ------------------------------------------------------------------------------
+# 2. Production Builds & Compiled Outputs
+# ------------------------------------------------------------------------------
+# TypeScript build artifacts
 dist/
+*/dist/
+build/
+*/build/
+*.tsbuildinfo
+
+# Next.js build artifacts & static export
+.next/
+*/.next/
+out/
+*/out/
+
+# ------------------------------------------------------------------------------
+# 3. Environment Variables & Credentials
+# ------------------------------------------------------------------------------
+# Ignore all .env files containing secrets
 .env
+.env.*
+*.env
+*.env.*
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+
+# Whitelist safe template / example files
+!.env.example
+!*/.env.example
+!.env.production.example
+!*/.env.production.example
+
+# ------------------------------------------------------------------------------
+# 4. Database, SQLite & Local Storage
+# ------------------------------------------------------------------------------
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/*.db
+prisma/*.db-journal
+prisma/*.sqlite
+prisma/*.sqlite3
+
+# Local user uploads / temporary assets
+uploads/
+*/uploads/
+tmp/
+temp/
+
+# ------------------------------------------------------------------------------
+# 5. Vercel & Cloud Deployment Metadata
+# ------------------------------------------------------------------------------
+.vercel/
+*/.vercel/
+
+# ------------------------------------------------------------------------------
+# 6. Docker & Local Overrides
+# ------------------------------------------------------------------------------
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# ------------------------------------------------------------------------------
+# 7. Diagnostic, Debug & Process Logs
+# ------------------------------------------------------------------------------
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------------------------------------------
+# 8. Test Coverage & Tooling
+# ------------------------------------------------------------------------------
+coverage/
+*/coverage/
+.nyc_output/
+
+# ------------------------------------------------------------------------------
+# 9. Operating System & Editor Artifacts
+# ------------------------------------------------------------------------------
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# IDEs & Text Editors
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.sublime-workspace
+*.sublime-project
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

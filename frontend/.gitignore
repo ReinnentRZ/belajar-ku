@@ -1,0 +1,39 @@
+# ==============================================================================
+# Belajar-Ku Frontend .gitignore (Next.js 14 App Router)
+# ==============================================================================
+
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Next.js Build Outputs
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# Environment & Local Secrets
+.env
+.env.*
+.env*.local
+!.env.example
+!.env.production.example
+
+# Vercel Deployment Metadata
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

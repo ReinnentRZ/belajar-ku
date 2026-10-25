@@ -25,6 +25,14 @@ enum TeachingMode {
   OFFLINE_VISIT
 }
 
+enum CategoryGroup {
+  ACADEMIC
+  BACA_TULIS_QURAN
+  TAJWID
+  MUROJAAH
+  DIFABEL
+}
+
 enum OrderStatus {
   WAITING_PAYMENT
   PAID
@@ -94,12 +102,14 @@ model TutorProfile {
   userId        String              @unique
   user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   bio           String
-  education     String
-  address       String
-  isVerified    Boolean             @default(false)
-  walletBalance Float               @default(0)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  education             String
+  address               String
+  teachingCredentials   String?             // e.g. "Sertifikasi Tahsin/Tilawah, Sanad Qiraat, Lulusan PLB, Lisensi Terapi Perilaku"
+  specialAccommodations String?             // e.g. "Bahasa Isyarat BISINDO, Huruf Braille, Pendampingan Autisme & ADHD, Terapi Sensori"
+  isVerified            Boolean             @default(false)
+  walletBalance         Float               @default(0)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   services        TutorService[]
   availabilities  TutorAvailability[]
@@ -129,12 +139,13 @@ model StudentProfile {
 }
 
 model Category {
-  id          String         @id @default(uuid())
-  name        String
-  targetGrade GradeLevel
-  slug        String         @unique
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String        @id @default(uuid())
+  name          String
+  targetGrade   GradeLevel
+  categoryGroup CategoryGroup @default(ACADEMIC)
+  slug          String        @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   services TutorService[]
 
@@ -142,20 +153,22 @@ model Category {
 }
 
 model TutorService {
-  id              String       @id @default(uuid())
-  tutorId         String
-  tutor           TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-  categoryId      String
-  category        Category     @relation(fields: [categoryId], references: [id])
-  title           String
-  teachingMode    TeachingMode
-  durationMinutes Int
-  sessionCount    Int          @default(1)
-  price           Float
-  description     String
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                    String       @id @default(uuid())
+  tutorId               String
+  tutor                 TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  categoryId            String
+  category              Category     @relation(fields: [categoryId], references: [id])
+  title                 String
+  teachingMode          TeachingMode
+  durationMinutes       Int
+  sessionCount          Int          @default(1)
+  price                 Float
+  description           String
+  syllabusHighlights    String[]     @default([])
+  specialAccommodations String?
+  isActive              Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   cartItems  CartItem[]
   orderItems OrderItem[]

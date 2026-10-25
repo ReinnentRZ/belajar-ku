@@ -8,10 +8,12 @@ import {
   CheckCircle2,
   Clock,
   GraduationCap,
+  Heart,
   MapPin,
   Plus,
   ShieldCheck,
   ShoppingCart,
+  Sparkles,
   User,
   Video,
 } from 'lucide-react';
@@ -237,6 +239,47 @@ export default function ServiceDetailPage() {
             </div>
           </div>
 
+          {/* Syllabus Highlights */}
+          {service.syllabusHighlights && service.syllabusHighlights.length > 0 && (
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-brand-600" />
+                Silabus & Rencana Pembelajaran
+              </h2>
+              <p className="text-xs text-slate-500">
+                Materi dan capaian kompetensi yang akan dipelajari ananda selama {service.sessionCount} sesi:
+              </p>
+              <div className="space-y-2.5 pt-1">
+                {service.syllabusHighlights.map((topic: string, idx: number) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-brand-200 transition-colors"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                      {idx + 1}
+                    </div>
+                    <span className="text-sm text-slate-700 font-medium leading-relaxed">
+                      {topic}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Special Accommodations Card */}
+          {service.specialAccommodations && (
+            <div className="bg-gradient-to-br from-amber-50/90 to-amber-100/50 p-6 sm:p-8 rounded-3xl border border-amber-200/80 shadow-sm space-y-3">
+              <div className="flex items-center gap-2 text-amber-950 font-bold text-base">
+                <Sparkles className="w-5 h-5 text-amber-600" />
+                Akomodasi Khusus & Fasilitas Belajar
+              </div>
+              <p className="text-sm text-amber-950/80 leading-relaxed font-medium">
+                {service.specialAccommodations}
+              </p>
+            </div>
+          )}
+
           {/* Tutor Bio & Qualifications */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -271,6 +314,32 @@ export default function ServiceDetailPage() {
             <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100">
               {tutor?.bio || 'Berdedikasi untuk membantu anak memahami materi secara menyenangkan dan penuh perhatian.'}
             </p>
+
+            {/* Teaching Credentials / Specific Accreditations */}
+            {tutor?.teachingCredentials && (
+              <div className="p-4 rounded-2xl bg-brand-50/70 border border-brand-200/80 space-y-1.5">
+                <div className="text-xs font-bold text-brand-900 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-brand-600" />
+                  Sertifikasi & Kredensial Khusus
+                </div>
+                <p className="text-xs text-brand-800 leading-relaxed font-medium">
+                  {tutor.teachingCredentials}
+                </p>
+              </div>
+            )}
+
+            {/* Tutor Personal Accommodations Support */}
+            {tutor?.specialAccommodations && (
+              <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200/80 space-y-1.5">
+                <div className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                  <Heart className="w-4 h-4 text-purple-600" />
+                  Kesiapan Mengajar Ramah Anak & Fasilitas Pendukung
+                </div>
+                <p className="text-xs text-purple-800 leading-relaxed font-medium">
+                  {tutor.specialAccommodations}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

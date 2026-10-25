@@ -120,6 +120,8 @@ export class UsersService {
         bio: input.bio,
         education: input.education,
         address: input.address,
+        ...(input.teachingCredentials !== undefined && { teachingCredentials: input.teachingCredentials }),
+        ...(input.specialAccommodations !== undefined && { specialAccommodations: input.specialAccommodations }),
       },
     });
   }

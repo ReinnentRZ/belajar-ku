@@ -18,6 +18,8 @@ export const updateTutorProfileSchema = z.object({
   bio: z.string().min(10, 'Bio must be at least 10 characters'),
   education: z.string().min(2, 'Education details must be provided'),
   address: z.string().min(5, 'Address must be at least 5 characters'),
+  teachingCredentials: z.string().optional(),
+  specialAccommodations: z.string().optional(),
 });
 
 export const verifyTutorParamSchema = z.object({

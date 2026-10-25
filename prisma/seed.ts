@@ -16,42 +16,80 @@ async function main() {
     {
       name: 'Calistung (Baca, Tulis, Hitung) PAUD',
       targetGrade: 'PAUD' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'calistung-paud',
     },
     {
       name: 'Pengenalan Huruf & Angka TK',
       targetGrade: 'TK' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'huruf-angka-tk',
     },
     {
       name: 'Matematika SD',
       targetGrade: 'SD' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'matematika-sd',
     },
     {
       name: 'Bahasa Indonesia SD',
       targetGrade: 'SD' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'bahasa-indonesia-sd',
     },
     {
       name: 'IPA Terpadu SD',
       targetGrade: 'SD' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'ipa-sd',
     },
     {
       name: 'Matematika SMP',
       targetGrade: 'SMP' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'matematika-smp',
     },
     {
       name: 'Bahasa Inggris SMP',
       targetGrade: 'SMP' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'bahasa-inggris-smp',
     },
     {
       name: 'IPA Fisika & Biologi SMP',
       targetGrade: 'SMP' as const,
+      categoryGroup: 'ACADEMIC' as const,
       slug: 'ipa-smp',
+    },
+    {
+      name: "Baca Tulis Al-Qur'an (BTQ) & Iqro Anak",
+      targetGrade: 'PAUD' as const,
+      categoryGroup: 'BACA_TULIS_QURAN' as const,
+      slug: 'btq-paud',
+    },
+    {
+      name: 'Kelas Tajwid, Makhraj & Tahsin Anak',
+      targetGrade: 'SD' as const,
+      categoryGroup: 'TAJWID' as const,
+      slug: 'tajwid-sd',
+    },
+    {
+      name: "Kelas Muroja'ah & Tahfidz Al-Qur'an",
+      targetGrade: 'SMP' as const,
+      categoryGroup: 'MUROJAAH' as const,
+      slug: 'murojaah-smp',
+    },
+    {
+      name: 'Kelas Khusus Difabel (Autisme & ADHD)',
+      targetGrade: 'SD' as const,
+      categoryGroup: 'DIFABEL' as const,
+      slug: 'difabel-abk',
+    },
+    {
+      name: 'Kelas Inklusif Bahasa Isyarat & Tunarungu',
+      targetGrade: 'SMP' as const,
+      categoryGroup: 'DIFABEL' as const,
+      slug: 'difabel-tunarungu',
     },
   ];
 
@@ -59,10 +97,11 @@ async function main() {
   for (const cat of initialCategories) {
     const createdCat = await prisma.category.upsert({
       where: { slug: cat.slug },
-      update: { name: cat.name, targetGrade: cat.targetGrade },
+      update: { name: cat.name, targetGrade: cat.targetGrade, categoryGroup: cat.categoryGroup },
       create: {
         name: cat.name,
         targetGrade: cat.targetGrade,
+        categoryGroup: cat.categoryGroup,
         slug: cat.slug,
       },
     });
@@ -172,6 +211,8 @@ async function main() {
       bio: 'Guru lulusan PGPAUD berpengalaman 4 tahun mengajar calistung ramah anak',
       education: 'S.Pd Pendidikan Guru PAUD, Universitas Negeri Jakarta',
       address: 'Cilandak, Jakarta Selatan',
+      teachingCredentials: 'S.Pd PGPAUD, Sertifikasi Montessori Early Childhood Level 1',
+      specialAccommodations: 'Kartu fonik sentuh bergambar, pasir kinetik, lagu edukatif motorik halus',
       isVerified: true,
       walletBalance: 74375, // Reflects 1 completed session net payout (Rp 87.500 gross - 15% platform fee Rp 13.125)
     },
@@ -180,6 +221,8 @@ async function main() {
       bio: 'Guru lulusan PGPAUD berpengalaman 4 tahun mengajar calistung ramah anak',
       education: 'S.Pd Pendidikan Guru PAUD, Universitas Negeri Jakarta',
       address: 'Cilandak, Jakarta Selatan',
+      teachingCredentials: 'S.Pd PGPAUD, Sertifikasi Montessori Early Childhood Level 1',
+      specialAccommodations: 'Kartu fonik sentuh bergambar, pasir kinetik, lagu edukatif motorik halus',
       isVerified: true,
       walletBalance: 74375,
     },
@@ -212,6 +255,13 @@ async function main() {
         sessionCount: 4,
         price: 350000,
         description: 'Bimbingan membaca, menulis, dan berhitung dengan kartu huruf fonik bergambar, stimulasi sensori motorik halus, dan lagu edukasi ramah anak.',
+        syllabusHighlights: [
+          'Pengenalan Fonik Bunyi Huruf Vokal & Konsonan',
+          'Latihan Sensori Motorik Menulis di Media Pasir & Kartu Raba',
+          'Mengenal Konsep Bilangan 1-20 dengan Benda Konkret',
+          'Membaca Suku Kata Terbuka (ba-bi-bu, ca-ci-cu)',
+        ],
+        specialAccommodations: 'Semua alat peraga montessori dan modul lembar mewarnai disediakan oleh pengajar.',
         isActive: true,
       },
     });
@@ -223,6 +273,13 @@ async function main() {
         sessionCount: 4,
         durationMinutes: 60,
         teachingMode: 'OFFLINE_VISIT',
+        syllabusHighlights: [
+          'Pengenalan Fonik Bunyi Huruf Vokal & Konsonan',
+          'Latihan Sensori Motorik Menulis di Media Pasir & Kartu Raba',
+          'Mengenal Konsep Bilangan 1-20 dengan Benda Konkret',
+          'Membaca Suku Kata Terbuka (ba-bi-bu, ca-ci-cu)',
+        ],
+        specialAccommodations: 'Semua alat peraga montessori dan modul lembar mewarnai disediakan oleh pengajar.',
       },
     });
   }
@@ -255,6 +312,8 @@ async function main() {
       bio: 'Tutor Matematika & Sains SMP fokus pemecahan soal logika',
       education: 'S.Si Matematika, Universitas Indonesia',
       address: 'Kebon Jeruk, Jakarta Barat',
+      teachingCredentials: 'S.Si Matematika UI, Medalis Perunggu Olimpiade Sains Nasional (OSN)',
+      specialAccommodations: 'Papan tulis digital interaktif (Geogebra/Desmos) dan rangkuman rumus ringkas',
       isVerified: true,
       walletBalance: 0,
     },
@@ -263,6 +322,8 @@ async function main() {
       bio: 'Tutor Matematika & Sains SMP fokus pemecahan soal logika',
       education: 'S.Si Matematika, Universitas Indonesia',
       address: 'Kebon Jeruk, Jakarta Barat',
+      teachingCredentials: 'S.Si Matematika UI, Medalis Perunggu Olimpiade Sains Nasional (OSN)',
+      specialAccommodations: 'Papan tulis digital interaktif (Geogebra/Desmos) dan rangkuman rumus ringkas',
       isVerified: true,
       walletBalance: 0,
     },
@@ -295,6 +356,13 @@ async function main() {
         sessionCount: 8,
         price: 600000,
         description: 'Pendampingan intensif materi Aljabar, Geometri, dan Persiapan Ujian Sekolah SMP dengan metode pemecahan masalah logika bertahap.',
+        syllabusHighlights: [
+          'Fondasi Aljabar & Persamaan Linear Satu/Dua Variabel',
+          'Geometri, Teorema Pythagoras, dan Bangun Ruang',
+          'Strategi Cepat & Analisis Logika Soal Cerita HOTS',
+          'Simulasi Ujian Sekolah & Pembahasan Trik Hitung Cepat',
+        ],
+        specialAccommodations: 'Sesi direkam dan materi PDF beranotasi dikirim setelah tiap pertemuan.',
         isActive: true,
       },
     });
@@ -306,6 +374,13 @@ async function main() {
         sessionCount: 8,
         durationMinutes: 90,
         teachingMode: 'ONLINE',
+        syllabusHighlights: [
+          'Fondasi Aljabar & Persamaan Linear Satu/Dua Variabel',
+          'Geometri, Teorema Pythagoras, dan Bangun Ruang',
+          'Strategi Cepat & Analisis Logika Soal Cerita HOTS',
+          'Simulasi Ujian Sekolah & Pembahasan Trik Hitung Cepat',
+        ],
+        specialAccommodations: 'Sesi direkam dan materi PDF beranotasi dikirim setelah tiap pertemuan.',
       },
     });
   }
@@ -396,6 +471,318 @@ async function main() {
     }
   }
   console.log('✅ Demo Unverified Tutor (Kak Rian Hidayat) seeded.');
+
+  // =========================================================================
+  // 6b. Demo Tutor 4: Ustadzah Maryam, S.Pd.I (BTQ & Iqro Specialist)
+  // =========================================================================
+  console.log('🧕 Seeding Tutor 4: Ustadzah Maryam (BTQ & Tajwid)...');
+  const maryamUser = await prisma.user.upsert({
+    where: { email: 'ustadzah.maryam@belajarku.com' },
+    update: {
+      name: 'Ustadzah Maryam, S.Pd.I',
+      phone: '081234567893',
+      passwordHash,
+      role: 'TUTOR',
+      isActive: true,
+    },
+    create: {
+      name: 'Ustadzah Maryam, S.Pd.I',
+      email: 'ustadzah.maryam@belajarku.com',
+      phone: '081234567893',
+      passwordHash,
+      role: 'TUTOR',
+      isActive: true,
+    },
+  });
+
+  const maryamProfile = await prisma.tutorProfile.upsert({
+    where: { userId: maryamUser.id },
+    update: {
+      bio: 'Guru ngaji dan tahsin anak berpengalaman 6 tahun mengajar Iqro, BTQ, dan makharijul huruf dengan metode visual interaktif ramah anak.',
+      education: 'S.Pd.I Pendidikan Agama Islam, UIN Syarif Hidayatullah Jakarta',
+      address: 'Tebet, Jakarta Selatan',
+      teachingCredentials: 'Sertifikasi Pengajar Tahsin Standar LPPQ & Lisensi Guru Tilawati / Iqro Anak',
+      specialAccommodations: 'Kartu flashcard hijaiyah warna-warni, modul panduan makhraj bergambar, audio pelafalan latihan mandiri',
+      isVerified: true,
+      walletBalance: 0,
+    },
+    create: {
+      userId: maryamUser.id,
+      bio: 'Guru ngaji dan tahsin anak berpengalaman 6 tahun mengajar Iqro, BTQ, dan makharijul huruf dengan metode visual interaktif ramah anak.',
+      education: 'S.Pd.I Pendidikan Agama Islam, UIN Syarif Hidayatullah Jakarta',
+      address: 'Tebet, Jakarta Selatan',
+      teachingCredentials: 'Sertifikasi Pengajar Tahsin Standar LPPQ & Lisensi Guru Tilawati / Iqro Anak',
+      specialAccommodations: 'Kartu flashcard hijaiyah warna-warni, modul panduan makhraj bergambar, audio pelafalan latihan mandiri',
+      isVerified: true,
+      walletBalance: 0,
+    },
+  });
+
+  await prisma.tutorAvailability.deleteMany({
+    where: { tutorId: maryamProfile.id },
+  });
+  await prisma.tutorAvailability.createMany({
+    data: [
+      { tutorId: maryamProfile.id, dayOfWeek: 2, startTime: '15:30', endTime: '16:30', isActive: true },
+      { tutorId: maryamProfile.id, dayOfWeek: 4, startTime: '15:30', endTime: '16:30', isActive: true },
+      { tutorId: maryamProfile.id, dayOfWeek: 6, startTime: '09:00', endTime: '10:00', isActive: true },
+    ],
+  });
+
+  const btqCatId = categoryMap.get('btq-paud')!;
+  let maryamService = await prisma.tutorService.findFirst({
+    where: { tutorId: maryamProfile.id, title: 'Les Privat BTQ & Iqro Dasar Metode Visual Anak' },
+  });
+  if (!maryamService) {
+    maryamService = await prisma.tutorService.create({
+      data: {
+        tutorId: maryamProfile.id,
+        categoryId: btqCatId,
+        title: 'Les Privat BTQ & Iqro Dasar Metode Visual Anak',
+        teachingMode: 'OFFLINE_VISIT',
+        durationMinutes: 60,
+        sessionCount: 8,
+        price: 480000,
+        description: "Bimbingan membaca Al-Qur'an mulai dari pengenalan huruf hijaiyah berharakat dasar, pelafalan makhraj, hingga latihan membaca surat pendek juz 30 dengan kartu visual ramah anak.",
+        syllabusHighlights: [
+          'Pengenalan 28 Huruf Hijaiyah dengan Kartu Flashcard Visual & Warna',
+          'Pelafalan Makhraj Huruf Dasar (Halq, Lisan, Syafatain)',
+          'Latihan Harakat Fathah, Kasrah, Dhommah, dan Tanwin',
+          'Penyambungan Huruf Hijaiyah & Praktek Baca Buku Iqro / Tilawati',
+          'Hafalan Doa Sehari-hari dan Surat-Surat Pendek Juz 30',
+        ],
+        specialAccommodations: 'Modul fisik kartu hijaiyah disediakan gratis, pendekatan sabar tanpa paksaan sesuai kecepatan belajar anak.',
+        isActive: true,
+      },
+    });
+  } else {
+    maryamService = await prisma.tutorService.update({
+      where: { id: maryamService.id },
+      data: {
+        price: 480000,
+        sessionCount: 8,
+        durationMinutes: 60,
+        teachingMode: 'OFFLINE_VISIT',
+        syllabusHighlights: [
+          'Pengenalan 28 Huruf Hijaiyah dengan Kartu Flashcard Visual & Warna',
+          'Pelafalan Makhraj Huruf Dasar (Halq, Lisan, Syafatain)',
+          'Latihan Harakat Fathah, Kasrah, Dhommah, dan Tanwin',
+          'Penyambungan Huruf Hijaiyah & Praktek Baca Buku Iqro / Tilawati',
+          'Hafalan Doa Sehari-hari dan Surat-Surat Pendek Juz 30',
+        ],
+        specialAccommodations: 'Modul fisik kartu hijaiyah disediakan gratis, pendekatan sabar tanpa paksaan sesuai kecepatan belajar anak.',
+      },
+    });
+  }
+  console.log('✅ Tutor 4 (Ustadzah Maryam - BTQ) seeded.');
+
+  // =========================================================================
+  // 6c. Demo Tutor 5: Ustadz Ahmad Al-Hafidz, S.Ag (Muroja'ah & Tahfidz Specialist)
+  // =========================================================================
+  console.log("📖 Seeding Tutor 5: Ustadz Ahmad (Muroja'ah & Tahfidz)...");
+  const ahmadUser = await prisma.user.upsert({
+    where: { email: 'ustadz.ahmad@belajarku.com' },
+    update: {
+      name: 'Ustadz Ahmad Al-Hafidz, S.Ag',
+      phone: '081234567894',
+      passwordHash,
+      role: 'TUTOR',
+      isActive: true,
+    },
+    create: {
+      name: 'Ustadz Ahmad Al-Hafidz, S.Ag',
+      email: 'ustadz.ahmad@belajarku.com',
+      phone: '081234567894',
+      passwordHash,
+      role: 'TUTOR',
+      isActive: true,
+    },
+  });
+
+  const ahmadProfile = await prisma.tutorProfile.upsert({
+    where: { userId: ahmadUser.id },
+    update: {
+      bio: "Hafidz 30 Juz bersanad muttashil, berpengalaman membina santri tahfidz dan program muroja'ah hafalan Al-Qur'an anak dan remaja.",
+      education: "S.Ag Ilmu Al-Qur'an dan Tafsir, Institut PTIQ Jakarta",
+      address: 'Kebayoran Baru, Jakarta Selatan',
+      teachingCredentials: "Hafidz 30 Juz Al-Qur'an Bersanad Muttashil, Ijazah Matan Jazariyyah & Tuhfatul Athfal",
+      specialAccommodations: 'Bimbingan privat tahsin & tahfidz intensif, target hafalan disesuaikan per anak, kartu kendali mutqin digital',
+      isVerified: true,
+      walletBalance: 0,
+    },
+    create: {
+      userId: ahmadUser.id,
+      bio: "Hafidz 30 Juz bersanad muttashil, berpengalaman membina santri tahfidz dan program muroja'ah hafalan Al-Qur'an anak dan remaja.",
+      education: "S.Ag Ilmu Al-Qur'an dan Tafsir, Institut PTIQ Jakarta",
+      address: 'Kebayoran Baru, Jakarta Selatan',
+      teachingCredentials: "Hafidz 30 Juz Al-Qur'an Bersanad Muttashil, Ijazah Matan Jazariyyah & Tuhfatul Athfal",
+      specialAccommodations: 'Bimbingan privat tahsin & tahfidz intensif, target hafalan disesuaikan per anak, kartu kendali mutqin digital',
+      isVerified: true,
+      walletBalance: 0,
+    },
+  });
+
+  await prisma.tutorAvailability.deleteMany({
+    where: { tutorId: ahmadProfile.id },
+  });
+  await prisma.tutorAvailability.createMany({
+    data: [
+      { tutorId: ahmadProfile.id, dayOfWeek: 1, startTime: '16:30', endTime: '18:00', isActive: true },
+      { tutorId: ahmadProfile.id, dayOfWeek: 3, startTime: '16:30', endTime: '18:00', isActive: true },
+      { tutorId: ahmadProfile.id, dayOfWeek: 6, startTime: '10:00', endTime: '11:30', isActive: true },
+    ],
+  });
+
+  const murojaahCatId = categoryMap.get('murojaah-smp')!;
+  let ahmadService = await prisma.tutorService.findFirst({
+    where: { tutorId: ahmadProfile.id, title: "Bimbingan Muroja'ah Intensif & Tahfidz Juz 'Amma (Juz 30)" },
+  });
+  if (!ahmadService) {
+    ahmadService = await prisma.tutorService.create({
+      data: {
+        tutorId: ahmadProfile.id,
+        categoryId: murojaahCatId,
+        title: "Bimbingan Muroja'ah Intensif & Tahfidz Juz 'Amma (Juz 30)",
+        teachingMode: 'ONLINE',
+        durationMinutes: 60,
+        sessionCount: 8,
+        price: 550000,
+        description: "Program pemantapan hafalan (muroja'ah), perbaikan tajwid lanjutan (mad, waqaf, ghunnah), serta setoran hafalan Juz 30 berkesinambungan dengan rekap monitoring digital berkala.",
+        syllabusHighlights: [
+          'Tes Penempatan Mutqin Hafalan Sebelum Bimbingan Dimulai',
+          'Kaidah Tajwid Lanjutan: Hukum Nun/Mim Sukun, Mad, dan Tanda Waqaf',
+          "Teknik Muroja'ah Mandiri 3x Pengulangan Harian (Metode Tikrar)",
+          "Setoran & Tasmi' Hafalan Surat An-Naba sampai An-Nas",
+          'Rapor Mutqin Mingguan & Konsultasi Perkembangan Bersama Orang Tua',
+        ],
+        specialAccommodations: 'Sesi audio feedback setoran mandiri di luar jam les, rekaman talaqqi makhraj eksklusif.',
+        isActive: true,
+      },
+    });
+  } else {
+    ahmadService = await prisma.tutorService.update({
+      where: { id: ahmadService.id },
+      data: {
+        price: 550000,
+        sessionCount: 8,
+        durationMinutes: 60,
+        teachingMode: 'ONLINE',
+        syllabusHighlights: [
+          'Tes Penempatan Mutqin Hafalan Sebelum Bimbingan Dimulai',
+          'Kaidah Tajwid Lanjutan: Hukum Nun/Mim Sukun, Mad, dan Tanda Waqaf',
+          "Teknik Muroja'ah Mandiri 3x Pengulangan Harian (Metode Tikrar)",
+          "Setoran & Tasmi' Hafalan Surat An-Naba sampai An-Nas",
+          'Rapor Mutqin Mingguan & Konsultasi Perkembangan Bersama Orang Tua',
+        ],
+        specialAccommodations: 'Sesi audio feedback setoran mandiri di luar jam les, rekaman talaqqi makhraj eksklusif.',
+      },
+    });
+  }
+  console.log("✅ Tutor 5 (Ustadz Ahmad - Muroja'ah) seeded.");
+
+  // =========================================================================
+  // 6d. Demo Tutor 6: Kak Nadia Putri, S.Pd (Special Needs & Difabel Specialist)
+  // =========================================================================
+  console.log('🤝 Seeding Tutor 6: Kak Nadia (Inklusif & ABK/Difabel)...');
+  const nadiaUser = await prisma.user.upsert({
+    where: { email: 'tutor.difabel@belajarku.com' },
+    update: {
+      name: 'Kak Nadia Putri, S.Pd',
+      phone: '081234567895',
+      passwordHash,
+      role: 'TUTOR',
+      isActive: true,
+    },
+    create: {
+      name: 'Kak Nadia Putri, S.Pd',
+      email: 'tutor.difabel@belajarku.com',
+      phone: '081234567895',
+      passwordHash,
+      role: 'TUTOR',
+      isActive: true,
+    },
+  });
+
+  const nadiaProfile = await prisma.tutorProfile.upsert({
+    where: { userId: nadiaUser.id },
+    update: {
+      bio: 'Pendidik Luar Biasa (PLB) tersertifikasi dengan spesialisasi pendampingan belajar ramah anak autisme, ADHD, dan slow learner melalui pendekatan sensori dan Program Pembelajaran Individual (PPI).',
+      education: 'S1 Pendidikan Luar Biasa (PLB), Universitas Negeri Jakarta (UNJ)',
+      address: 'Pasar Minggu, Jakarta Selatan',
+      teachingCredentials: 'S.Pd PLB UNJ, Sertifikat Terapi Perilaku Applied Behavior Analysis (ABA), Penguasaan Bahasa Isyarat BISINDO Tingkat Lanjut',
+      specialAccommodations: 'Penyusunan Program Pembelajaran Individual (PPI), alat peraga taktil/sensori, jeda waktu istirahat fleksibel jika overstimulasi',
+      isVerified: true,
+      walletBalance: 0,
+    },
+    create: {
+      userId: nadiaUser.id,
+      bio: 'Pendidik Luar Biasa (PLB) tersertifikasi dengan spesialisasi pendampingan belajar ramah anak autisme, ADHD, dan slow learner melalui pendekatan sensori dan Program Pembelajaran Individual (PPI).',
+      education: 'S1 Pendidikan Luar Biasa (PLB), Universitas Negeri Jakarta (UNJ)',
+      address: 'Pasar Minggu, Jakarta Selatan',
+      teachingCredentials: 'S.Pd PLB UNJ, Sertifikat Terapi Perilaku Applied Behavior Analysis (ABA), Penguasaan Bahasa Isyarat BISINDO Tingkat Lanjut',
+      specialAccommodations: 'Penyusunan Program Pembelajaran Individual (PPI), alat peraga taktil/sensori, jeda waktu istirahat fleksibel jika overstimulasi',
+      isVerified: true,
+      walletBalance: 0,
+    },
+  });
+
+  await prisma.tutorAvailability.deleteMany({
+    where: { tutorId: nadiaProfile.id },
+  });
+  await prisma.tutorAvailability.createMany({
+    data: [
+      { tutorId: nadiaProfile.id, dayOfWeek: 1, startTime: '14:00', endTime: '15:30', isActive: true },
+      { tutorId: nadiaProfile.id, dayOfWeek: 4, startTime: '14:00', endTime: '15:30', isActive: true },
+      { tutorId: nadiaProfile.id, dayOfWeek: 6, startTime: '09:30', endTime: '11:00', isActive: true },
+    ],
+  });
+
+  const difabelCatId = categoryMap.get('difabel-abk')!;
+  let nadiaService = await prisma.tutorService.findFirst({
+    where: { tutorId: nadiaProfile.id, title: 'Pendampingan Belajar Inklusif & Sensori ABK (Autisme, ADHD, Slow Learner)' },
+  });
+  if (!nadiaService) {
+    nadiaService = await prisma.tutorService.create({
+      data: {
+        tutorId: nadiaProfile.id,
+        categoryId: difabelCatId,
+        title: 'Pendampingan Belajar Inklusif & Sensori ABK (Autisme, ADHD, Slow Learner)',
+        teachingMode: 'OFFLINE_VISIT',
+        durationMinutes: 60,
+        sessionCount: 4,
+        price: 450000,
+        description: 'Layanan bimbingan belajar khusus dengan pendekatan holistik dan individual (PPI) untuk menumbuhkan fokus belajar, kemandirian calistung fungsional, dan regulasi emosi anak berkebutuhan khusus.',
+        syllabusHighlights: [
+          'Asesmen Kebutuhan Awal & Penyusunan Program Pembelajaran Individual (PPI)',
+          'Latihan Sensori Motorik & Stimulasi Fokus Sebelum Mulai Belajar',
+          'Calistung Fungsional Menggunakan Media Benda Konkret & Kartu Gambar',
+          'Pengembangan Regulasi Emosi Diri & Komunikasi Efektif Belajar',
+          'Konsultasi Perkembangan Belajar Mingguan Bersama Orang Tua',
+        ],
+        specialAccommodations: "Membawa kit peraga sensori taktil mandiri, kartu visual 'Social Stories', fleksibilitas durasi istirahat ramah anak.",
+        isActive: true,
+      },
+    });
+  } else {
+    nadiaService = await prisma.tutorService.update({
+      where: { id: nadiaService.id },
+      data: {
+        price: 450000,
+        sessionCount: 4,
+        durationMinutes: 60,
+        teachingMode: 'OFFLINE_VISIT',
+        syllabusHighlights: [
+          'Asesmen Kebutuhan Awal & Penyusunan Program Pembelajaran Individual (PPI)',
+          'Latihan Sensori Motorik & Stimulasi Fokus Sebelum Mulai Belajar',
+          'Calistung Fungsional Menggunakan Media Benda Konkret & Kartu Gambar',
+          'Pengembangan Regulasi Emosi Diri & Komunikasi Efektif Belajar',
+          'Konsultasi Perkembangan Belajar Mingguan Bersama Orang Tua',
+        ],
+        specialAccommodations: "Membawa kit peraga sensori taktil mandiri, kartu visual 'Social Stories', fleksibilitas durasi istirahat ramah anak.",
+      },
+    });
+  }
+  console.log('✅ Tutor 6 (Kak Nadia - Inklusif/Difabel) seeded.');
 
   // =========================================================================
   // 7. Pre-completed Order & History (Parent Demo + Kak Sarah for Kenzi)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Calendar, Clock, Filter, GraduationCap, MapPin, Search, Sparkles, User, Video } from 'lucide-react';
+import { BookOpen, Calendar, Clock, Filter, GraduationCap, Heart, MapPin, Search, ShieldCheck, Sparkles, User, Video } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import React, { Suspense, useState } from 'react';
@@ -11,8 +11,10 @@ import { formatRupiah } from '../../lib/utils';
 function ServicesCatalogContent() {
   const searchParams = useSearchParams();
   const initialGrade = searchParams.get('gradeLevel') || '';
+  const initialCategoryGroup = searchParams.get('categoryGroup') || '';
 
   const [selectedGrade, setSelectedGrade] = useState(initialGrade);
+  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(initialCategoryGroup);
   const [selectedMode, setSelectedMode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -27,10 +29,11 @@ function ServicesCatalogContent() {
 
   // Fetch Services
   const { data: servicesData, isLoading } = useQuery({
-    queryKey: ['services', selectedGrade, selectedMode, searchQuery],
+    queryKey: ['services', selectedGrade, selectedCategoryGroup, selectedMode, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedGrade) params.append('gradeLevel', selectedGrade);
+      if (selectedCategoryGroup) params.append('categoryGroup', selectedCategoryGroup);
       if (selectedMode) params.append('teachingMode', selectedMode);
       if (searchQuery) params.append('search', searchQuery);
 
@@ -54,7 +57,7 @@ function ServicesCatalogContent() {
             Pilihan Guru Les Privat Terbaik
           </h1>
           <p className="text-brand-100 text-sm sm:text-base leading-relaxed">
-            Spesialisasi bimbingan Calistung PAUD, penguatan mata pelajaran SD & SMP. Pilih jadwal yang sesuai dengan rutinitas keluarga.
+            Spesialisasi bimbingan Calistung PAUD, penguatan mata pelajaran SD & SMP, Literasi Al-Qur'an (BTQ/Tajwid), serta Kelas Khusus Difabel (ABK).
           </p>
         </div>
       </div>
@@ -69,7 +72,7 @@ function ServicesCatalogContent() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari mata pelajaran, topik (misal: Calistung, Matematika)..."
+              placeholder="Cari mata pelajaran, topik (misal: Calistung, Al-Qur'an, ABK)..."
               className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm transition-colors"
             />
           </div>
@@ -86,6 +89,43 @@ function ServicesCatalogContent() {
               <option value="OFFLINE_VISIT">🏡 Guru Datang ke Rumah</option>
             </select>
           </div>
+        </div>
+
+        {/* Category Group Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pt-2 border-t border-slate-100 text-xs sm:text-sm">
+          <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 mr-1">
+            <Sparkles className="w-3.5 h-3.5" />
+            Kategori:
+          </span>
+          <button
+            onClick={() => setSelectedCategoryGroup('')}
+            className={`px-3 py-1.5 rounded-full font-semibold transition-all shrink-0 ${
+              selectedCategoryGroup === ''
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Semua Bidang
+          </button>
+          {[
+            { id: 'ACADEMIC', label: '📚 Akademik' },
+            { id: 'BACA_TULIS_QURAN', label: "📖 Al-Qur'an (BTQ)" },
+            { id: 'TAJWID', label: '✨ Tajwid & Makhraj' },
+            { id: 'MUROJAAH', label: "🕌 Muroja'ah & Tahfidz" },
+            { id: 'DIFABEL', label: '🤝 Inklusif / Difabel (ABK)' },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategoryGroup(cat.id === selectedCategoryGroup ? '' : cat.id)}
+              className={`px-3.5 py-1.5 rounded-full font-semibold transition-all shrink-0 ${
+                selectedCategoryGroup === cat.id
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* Grade Level Pills */}
@@ -107,7 +147,7 @@ function ServicesCatalogContent() {
           {['PAUD', 'TK', 'SD', 'SMP'].map((g) => (
             <button
               key={g}
-              onClick={() => setSelectedGrade(g)}
+              onClick={() => setSelectedGrade(selectedGrade === g ? '' : g)}
               className={`px-3.5 py-1.5 rounded-full font-semibold transition-all shrink-0 ${
                 selectedGrade === g
                   ? 'bg-brand-600 text-white shadow-sm'
@@ -144,6 +184,7 @@ function ServicesCatalogContent() {
           <button
             onClick={() => {
               setSelectedGrade('');
+              setSelectedCategoryGroup('');
               setSelectedMode('');
               setSearchQuery('');
             }}
@@ -157,6 +198,8 @@ function ServicesCatalogContent() {
           {services.map((svc: any) => {
             const tutorUser = svc.tutor?.user;
             const category = svc.category;
+            const isQuranic = ['BACA_TULIS_QURAN', 'TAJWID', 'MUROJAAH'].includes(category?.categoryGroup);
+            const isDifabel = category?.categoryGroup === 'DIFABEL';
 
             return (
               <div
@@ -165,12 +208,24 @@ function ServicesCatalogContent() {
               >
                 {/* Header Badge */}
                 <div className="p-6 pb-4 flex-1 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
-                      {category?.name || 'Mata Pelajaran'}
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
+                        {category?.name || 'Mata Pelajaran'}
+                      </span>
+                      {isDifabel && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                          <Heart className="w-3 h-3 text-rose-500" /> Inklusif
+                        </span>
+                      )}
+                      {isQuranic && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3 text-emerald-600" /> Al-Qur'an
+                        </span>
+                      )}
+                    </div>
                     <span
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
                         svc.teachingMode === 'ONLINE'
                           ? 'bg-blue-50 text-blue-700 border border-blue-200'
                           : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -192,20 +247,39 @@ function ServicesCatalogContent() {
                     {svc.title}
                   </h3>
 
-                  <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed">
+                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                     {svc.description}
                   </p>
+
+                  {/* Special Accommodations Highlight */}
+                  {svc.specialAccommodations && (
+                    <div className="bg-amber-50/80 border border-amber-200/60 rounded-xl p-2.5 text-[11px] text-amber-900 flex items-start gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">
+                        <strong className="font-semibold text-amber-950">Akomodasi:</strong> {svc.specialAccommodations}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Tutor Info */}
                   <div className="pt-3 border-t border-slate-100 flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs shrink-0">
                       <User className="w-4 h-4 text-brand-600" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold text-slate-800 truncate">
                         {tutorUser?.name || 'Guru Les Belajar-Ku'}
                       </div>
-                      <div className="text-[10px] text-slate-400">Guru Terverifikasi</div>
+                      <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                        {svc.tutor?.teachingCredentials ? (
+                          <>
+                            <ShieldCheck className="w-3 h-3 text-brand-600 shrink-0" />
+                            <span className="truncate">{svc.tutor.teachingCredentials}</span>
+                          </>
+                        ) : (
+                          'Guru Terverifikasi'
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

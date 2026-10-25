@@ -23,6 +23,7 @@ export class ServicesService {
       data: {
         name: input.name,
         targetGrade: input.targetGrade,
+        categoryGroup: input.categoryGroup || 'ACADEMIC',
         slug: input.slug,
       },
     });
@@ -62,6 +63,8 @@ export class ServicesService {
         sessionCount: input.sessionCount,
         price: input.price,
         description: input.description,
+        syllabusHighlights: input.syllabusHighlights || [],
+        specialAccommodations: input.specialAccommodations,
         isActive: true,
       },
       include: {
@@ -149,6 +152,8 @@ export class ServicesService {
         ...(input.sessionCount && { sessionCount: input.sessionCount }),
         ...(input.price && { price: input.price }),
         ...(input.description && { description: input.description }),
+        ...(input.syllabusHighlights !== undefined && { syllabusHighlights: input.syllabusHighlights }),
+        ...(input.specialAccommodations !== undefined && { specialAccommodations: input.specialAccommodations }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
       },
       include: {
@@ -232,6 +237,7 @@ export class ServicesService {
       teachingMode?: 'ONLINE' | 'OFFLINE_VISIT';
       category?: {
         targetGrade?: 'PAUD' | 'TK' | 'SD' | 'SMP';
+        categoryGroup?: 'ACADEMIC' | 'BACA_TULIS_QURAN' | 'TAJWID' | 'MUROJAAH' | 'DIFABEL';
         slug?: string;
       };
       OR?: Array<
@@ -246,13 +252,16 @@ export class ServicesService {
       where.teachingMode = query.teachingMode;
     }
 
-    if (query.gradeLevel || query.categorySlug) {
+    if (query.gradeLevel || query.categorySlug || query.categoryGroup) {
       where.category = {};
       if (query.gradeLevel) {
         where.category.targetGrade = query.gradeLevel;
       }
       if (query.categorySlug) {
         where.category.slug = query.categorySlug;
+      }
+      if (query.categoryGroup) {
+        where.category.categoryGroup = query.categoryGroup;
       }
     }
 

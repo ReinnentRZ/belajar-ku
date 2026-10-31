@@ -4,11 +4,11 @@ services:
     container_name: belajarku-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: belajarku
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-belajarku}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -25,7 +25,7 @@ services:
     container_name: belajarku-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -45,7 +45,7 @@ services:
     container_name: belajarku-api
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "${PORT:-5000}:5000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,16 +55,20 @@ services:
       # Bind mounts for live code reloading
       - ./src:/app/src
       - ./prisma:/app/prisma
+      - ./scripts:/app/scripts
+      - ./package.json:/app/package.json
+      - belajarku-uploads:/app/uploads
       # Anonymous volume preventing host OS architecture node_modules pollution
       - /app/node_modules
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/belajarku?schema=public"
-      REDIS_URL: "redis://redis:6379"
-      JWT_SECRET: "belajarku_super_secret_jwt_key_2026"
-      PORT: 5000
-      NODE_ENV: "development"
-      DB_HOST: "postgres"
-      DB_PORT: 5432
+      DATABASE_URL: "${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/belajarku?schema=public}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
+      JWT_SECRET: "${JWT_SECRET:-belajarku_super_secret_jwt_key_demo_2026}"
+      PORT: "${PORT:-5000}"
+      NODE_ENV: "${NODE_ENV:-development}"
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"
     networks:
       - belajarku-network
 
@@ -76,7 +80,7 @@ services:
     container_name: belajarku-frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_started
@@ -85,10 +89,10 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      NODE_ENV: development
-      PORT: 3000
-      NEXT_PUBLIC_API_URL: "http://localhost:5000"
-      INTERNAL_API_URL: "http://api:5000"
+      NODE_ENV: "${NODE_ENV:-development}"
+      PORT: "${FRONTEND_PORT:-3000}"
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:5000}"
+      INTERNAL_API_URL: "${INTERNAL_API_URL:-http://api:5000}"
     networks:
       - belajarku-network
 
@@ -96,6 +100,8 @@ volumes:
   pgdata:
     driver: local
   redisdata:
+    driver: local
+  belajarku-uploads:
     driver: local
 
 networks:

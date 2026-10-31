@@ -14,6 +14,7 @@
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "test:e2e": "tsx scripts/test-e2e-flow.ts",
+    "audit:full": "tsx scripts/audit-full-system.ts",
     "frontend:install": "npm --prefix frontend install",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
@@ -36,6 +37,7 @@
   "dependencies": {
     "@fastify/cors": "^10.0.2",
     "@fastify/jwt": "^9.0.4",
+    "@fastify/multipart": "^10.1.6",
     "@prisma/client": "^5.22.0",
     "bcrypt": "^5.1.1",
     "date-fns": "^4.1.0",

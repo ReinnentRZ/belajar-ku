@@ -1,5 +1,7 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -90,6 +92,18 @@ async function main() {
       targetGrade: 'SMP' as const,
       categoryGroup: 'DIFABEL' as const,
       slug: 'difabel-tunarungu',
+    },
+    {
+      name: 'Modul Ajar & RPP Kurikulum Merdeka',
+      targetGrade: 'SD' as const,
+      categoryGroup: 'ADMINISTRASI_GURU' as const,
+      slug: 'modul-ajar-merdeka',
+    },
+    {
+      name: 'Pendampingan LPJ Dana BOS & Keuangan Sekolah',
+      targetGrade: 'SMP' as const,
+      categoryGroup: 'ADMINISTRASI_GURU' as const,
+      slug: 'lpj-bos-sekolah',
     },
   ];
 
@@ -785,7 +799,189 @@ async function main() {
   console.log('✅ Tutor 6 (Kak Nadia - Inklusif/Difabel) seeded.');
 
   // =========================================================================
-  // 7. Pre-completed Order & History (Parent Demo + Kak Sarah for Kenzi)
+  // 7. Demo Tutor 7: Kak Farhan Ramadhan, M.Pd (Konsultan Administrasi Sekolah & Kurikulum Merdeka)
+  // =========================================================================
+  console.log('📑 Seeding Tutor 7: Kak Farhan (Administrasi Guru & Kurikulum Merdeka)...');
+  const farhanUser = await prisma.user.upsert({
+    where: { email: 'tutor.admin@belajarku.com' },
+    update: {
+      name: 'Kak Farhan Ramadhan, M.Pd',
+      phone: '081234567897',
+      passwordHash,
+      role: 'TUTOR',
+    },
+    create: {
+      name: 'Kak Farhan Ramadhan, M.Pd',
+      email: 'tutor.admin@belajarku.com',
+      phone: '081234567897',
+      passwordHash,
+      role: 'TUTOR',
+    },
+  });
+
+  const farhanProfile = await prisma.tutorProfile.upsert({
+    where: { userId: farhanUser.id },
+    update: {
+      bio: 'Konsultan kurikulum & administrasi sekolah berpengalaman 8 tahun, fasilitator nasional Kurikulum Merdeka',
+      education: 'M.Pd Manajemen Pendidikan, Universitas Negeri Jakarta',
+      address: 'Menteng, Jakarta Pusat',
+      teachingCredentials: 'M.Pd Manajemen Pendidikan UNJ, Fasilitator Nasional Sekolah Penggerak (Kemendikbudristek)',
+      specialAccommodations: 'Penyusunan berkas siap akreditasi, template dokumen editable .docx/.xlsx, dan asistensi revisi via zoom/chat',
+      isVerified: true,
+      walletBalance: 0,
+    },
+    create: {
+      userId: farhanUser.id,
+      bio: 'Konsultan kurikulum & administrasi sekolah berpengalaman 8 tahun, fasilitator nasional Kurikulum Merdeka',
+      education: 'M.Pd Manajemen Pendidikan, Universitas Negeri Jakarta',
+      address: 'Menteng, Jakarta Pusat',
+      teachingCredentials: 'M.Pd Manajemen Pendidikan UNJ, Fasilitator Nasional Sekolah Penggerak (Kemendikbudristek)',
+      specialAccommodations: 'Penyusunan berkas siap akreditasi, template dokumen editable .docx/.xlsx, dan asistensi revisi via zoom/chat',
+      isVerified: true,
+      walletBalance: 0,
+    },
+  });
+
+  // Farhan Services (Deliverable-based)
+  const modulAjarCatId = categoryMap.get('modul-ajar-merdeka')!;
+  let farhanService1 = await prisma.tutorService.findFirst({
+    where: { tutorId: farhanProfile.id, title: 'Paket Lengkap Modul Ajar & Asesmen Kurikulum Merdeka (Fase A-C)' },
+  });
+  if (!farhanService1) {
+    farhanService1 = await prisma.tutorService.create({
+      data: {
+        tutorId: farhanProfile.id,
+        categoryId: modulAjarCatId,
+        title: 'Paket Lengkap Modul Ajar & Asesmen Kurikulum Merdeka (Fase A-C)',
+        serviceType: 'DELIVERABLE_BASED',
+        teachingMode: 'ONLINE',
+        durationMinutes: 60,
+        sessionCount: 1,
+        price: 350000,
+        estimatedDays: 3,
+        deliverableFormats: ['DOCX', 'PDF', 'XLSX'],
+        maxRevisions: 2,
+        description: 'Layanan penyusunan dokumen perangkat ajar Kurikulum Merdeka terlengkap untuk SD/MI. Mencakup Modul Ajar, Capaian Pembelajaran (CP), Alur Tujuan Pembelajaran (ATP), dan instrumen asesmen formatif & sumatif disesuaikan dengan karakteristik sekolah Anda.',
+        syllabusHighlights: [
+          'Penyelarasan CP (Capaian Pembelajaran) & ATP (Alur Tujuan Pembelajaran)',
+          'Penyusunan Modul Ajar Lengkap dengan Diferensiasi Pembelajaran',
+          'Instrumen Asesmen Diagnostik, Formatif, dan Sumatif Berbasis Rubrik',
+          'Lembar Kerja Peserta Didik (LKPD) Siap Cetak dan Modifikasi',
+          'Termasuk 2x Kesempatan Revisi Sesuai Catatan Pengawas / Kepala Sekolah',
+        ],
+        specialAccommodations: 'Dokumen master dikirim dalam format editable (.docx & .xlsx) serta PDF siap cetak.',
+        isActive: true,
+      },
+    });
+  } else {
+    farhanService1 = await prisma.tutorService.update({
+      where: { id: farhanService1.id },
+      data: {
+        price: 350000,
+        sessionCount: 1,
+        serviceType: 'DELIVERABLE_BASED',
+        estimatedDays: 3,
+        deliverableFormats: ['DOCX', 'PDF', 'XLSX'],
+        maxRevisions: 2,
+        description: 'Layanan penyusunan dokumen perangkat ajar Kurikulum Merdeka terlengkap untuk SD/MI. Mencakup Modul Ajar, Capaian Pembelajaran (CP), Alur Tujuan Pembelajaran (ATP), dan instrumen asesmen formatif & sumatif disesuaikan dengan karakteristik sekolah Anda.',
+        syllabusHighlights: [
+          'Penyelarasan CP (Capaian Pembelajaran) & ATP (Alur Tujuan Pembelajaran)',
+          'Penyusunan Modul Ajar Lengkap dengan Diferensiasi Pembelajaran',
+          'Instrumen Asesmen Diagnostik, Formatif, dan Sumatif Berbasis Rubrik',
+          'Lembar Kerja Peserta Didik (LKPD) Siap Cetak dan Modifikasi',
+          'Termasuk 2x Kesempatan Revisi Sesuai Catatan Pengawas / Kepala Sekolah',
+        ],
+        specialAccommodations: 'Dokumen master dikirim dalam format editable (.docx & .xlsx) serta PDF siap cetak.',
+      },
+    });
+  }
+
+  const lpjCatId = categoryMap.get('lpj-bos-sekolah')!;
+  let farhanService2 = await prisma.tutorService.findFirst({
+    where: { tutorId: farhanProfile.id, title: 'Jasa Penyusunan & Verifikasi SPJ / LPJ Dana BOS & BOP Sekolah' },
+  });
+  if (!farhanService2) {
+    farhanService2 = await prisma.tutorService.create({
+      data: {
+        tutorId: farhanProfile.id,
+        categoryId: lpjCatId,
+        title: 'Jasa Penyusunan & Verifikasi SPJ / LPJ Dana BOS & BOP Sekolah',
+        serviceType: 'DELIVERABLE_BASED',
+        teachingMode: 'ONLINE',
+        durationMinutes: 60,
+        sessionCount: 1,
+        price: 750000,
+        estimatedDays: 5,
+        deliverableFormats: ['XLSX', 'PDF', 'ZIP'],
+        maxRevisions: 2,
+        description: 'Jasa pendampingan dan pembuatan laporan pertanggungjawaban (SPJ/LPJ) Dana Bantuan Operasional Sekolah (BOS) reguler maupun kinerja. Sesuai juknis Kemendikbudristek dan format ARKAS, lengkap dengan lampiran bukti transaksi dan rekap perpajakan.',
+        syllabusHighlights: [
+          'Rekonsiliasi Buku Kas Umum (BKU), Buku Pembantu Kas, dan Buku Bank',
+          'Penyusunan Berkas Pertanggungjawaban Belanja Barang/Jasa Sesuai ARKAS',
+          'Perhitungan & Rekapitulasi Pajak PPh 21, 22, 23 dan PPN',
+          'Kelengkapan Berita Acara Penerimaan Barang & Bukti Dokumentasi Fisik',
+          'Garansi Pendampingan hingga Laporan Diterima Tim Manajemen BOS Disdik',
+        ],
+        specialAccommodations: 'Termasuk template pembukuan otomatis Excel dan pendampingan input ARKAS.',
+        isActive: true,
+      },
+    });
+  } else {
+    farhanService2 = await prisma.tutorService.update({
+      where: { id: farhanService2.id },
+      data: {
+        price: 750000,
+        sessionCount: 1,
+        serviceType: 'DELIVERABLE_BASED',
+        estimatedDays: 5,
+        deliverableFormats: ['XLSX', 'PDF', 'ZIP'],
+        maxRevisions: 2,
+        description: 'Jasa pendampingan dan pembuatan laporan pertanggungjawaban (SPJ/LPJ) Dana Bantuan Operasional Sekolah (BOS) reguler maupun kinerja. Sesuai juknis Kemendikbudristek dan format ARKAS, lengkap dengan lampiran bukti transaksi dan rekap perpajakan.',
+        syllabusHighlights: [
+          'Rekonsiliasi Buku Kas Umum (BKU), Buku Pembantu Kas, dan Buku Bank',
+          'Penyusunan Berkas Pertanggungjawaban Belanja Barang/Jasa Sesuai ARKAS',
+          'Perhitungan & Rekapitulasi Pajak PPh 21, 22, 23 dan PPN',
+          'Kelengkapan Berita Acara Penerimaan Barang & Bukti Dokumentasi Fisik',
+          'Garansi Pendampingan hingga Laporan Diterima Tim Manajemen BOS Disdik',
+        ],
+        specialAccommodations: 'Termasuk template pembukuan otomatis Excel dan pendampingan input ARKAS.',
+      },
+    });
+  }
+  console.log('✅ Tutor 7 (Kak Farhan - Administrasi Sekolah) seeded with 2 deliverable services.');
+
+  // =========================================================================
+  // 8. Demo Institution Account (Kepala Sekolah SDN 01 Pagi)
+  // =========================================================================
+  console.log('🏫 Seeding Demo Institution Account...');
+  const institutionUser = await prisma.user.upsert({
+    where: { email: 'kepsek.sdn01@belajarku.com' },
+    update: {
+      name: 'Bpk. Drs. H. Suryanto, M.Pd',
+      phone: '081122334455',
+      passwordHash,
+      role: 'INSTITUTION',
+      schoolName: 'SD Negeri 01 Pagi Menteng',
+    },
+    create: {
+      name: 'Bpk. Drs. H. Suryanto, M.Pd',
+      email: 'kepsek.sdn01@belajarku.com',
+      phone: '081122334455',
+      passwordHash,
+      role: 'INSTITUTION',
+      schoolName: 'SD Negeri 01 Pagi Menteng',
+    },
+  });
+
+  await prisma.cart.upsert({
+    where: { parentId: institutionUser.id },
+    update: {},
+    create: { parentId: institutionUser.id },
+  });
+  console.log('✅ Demo Institution Account (SDN 01 Pagi Menteng) seeded with cart.');
+
+  // =========================================================================
+  // 9. Pre-completed Order & History (Parent Demo + Kak Sarah for Kenzi)
   // =========================================================================
   console.log('💳 Seeding Pre-completed Order & Booking Sessions...');
   const demoInvoiceNumber = 'INV-DEMO-PAUD-001';
@@ -959,14 +1155,133 @@ async function main() {
   });
 
   console.log(`✅ Order ${demoInvoiceNumber} seeded: 1 COMPLETED, 1 DISPUTED (with SessionReport), 2 SCHEDULED.`);
+
+  // =========================================================================
+  // 10. Pre-completed Deliverable Order (Institution Demo + Kak Farhan)
+  // =========================================================================
+  console.log('📑 Seeding Pre-completed Deliverable Order & Sample Attachment...');
+  const deliverableInvoiceNumber = 'INV-DEMO-ADMIN-001';
+
+  let deliverableOrder = await prisma.order.findUnique({
+    where: { invoiceNumber: deliverableInvoiceNumber },
+  });
+
+  if (deliverableOrder) {
+    await prisma.orderAttachment.deleteMany({
+      where: { orderId: deliverableOrder.id },
+    });
+    await prisma.orderItem.deleteMany({
+      where: { orderId: deliverableOrder.id },
+    });
+    await prisma.order.delete({
+      where: { id: deliverableOrder.id },
+    });
+  }
+
+  deliverableOrder = await prisma.order.create({
+    data: {
+      invoiceNumber: deliverableInvoiceNumber,
+      parentId: institutionUser.id,
+      totalAmount: 350000,
+      status: 'PAID',
+      serviceType: 'DELIVERABLE_BASED',
+      deliverableStatus: 'DELIVERED',
+      revisionCount: 0,
+      maxRevisions: 2,
+    },
+  });
+
+  const deliverableOrderItem = await prisma.orderItem.create({
+    data: {
+      orderId: deliverableOrder.id,
+      serviceId: farhanService1.id,
+      tutorId: farhanProfile.id,
+      serviceType: 'DELIVERABLE_BASED',
+      priceSnapshot: 350000,
+      platformFeePercent: 15.00,
+      totalSessions: 1,
+      completedSessions: 0,
+      selectedSlotsSnapshot: [],
+      deliverableStatus: 'DELIVERED',
+      revisionCount: 0,
+      maxRevisions: 2,
+      notes: 'Mohon fokus pada Modul Ajar IPAS Kelas 4 Bab Tumbuhan, Sumber Kehidupan di Bumi, sertakan lembar kerja siswa (LKPD) berbasis eksperimen.',
+    },
+  });
+
+  // Create sample physical deliverable file on disk
+  const sampleUploadDir = path.join(process.cwd(), 'uploads', 'deliverables', deliverableOrder.id);
+  if (!fs.existsSync(sampleUploadDir)) {
+    fs.mkdirSync(sampleUploadDir, { recursive: true });
+  }
+
+  const sampleFileName = 'Modul_Ajar_IPAS_Kelas4_SDN01_Menteng.pdf';
+  const sampleFilePath = path.join(sampleUploadDir, sampleFileName);
+  const sampleContent = `%PDF-1.4
+% Belajar-Ku Platform Deliverable Document
+% Order Invoice: ${deliverableInvoiceNumber}
+% Pemesan: SD Negeri 01 Pagi Menteng (Bpk. Drs. H. Suryanto, M.Pd)
+% Penyusun: Kak Farhan Ramadhan, M.Pd
+% Judul: Modul Ajar IPAS Kelas 4 - Fase B (Kurikulum Merdeka)
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 200 >>
+stream
+BT
+/F1 18 Tf
+50 700 Td
+(Belajar-Ku: Modul Ajar IPAS Kelas 4 - SDN 01 Pagi) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000010 00000 n 
+0000000060 00000 n 
+0000000115 00000 n 
+0000000195 00000 n 
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+450
+%%EOF`;
+
+  fs.writeFileSync(sampleFilePath, sampleContent, 'utf-8');
+  const sampleFileStats = fs.statSync(sampleFilePath);
+
+  await prisma.orderAttachment.create({
+    data: {
+      orderId: deliverableOrder.id,
+      orderItemId: deliverableOrderItem.id,
+      fileName: sampleFileName,
+      fileUrl: sampleFilePath,
+      fileSize: sampleFileStats.size,
+      mimeType: 'application/pdf',
+      uploadedById: farhanUser.id,
+    },
+  });
+
+  console.log(`✅ Deliverable Order ${deliverableInvoiceNumber} seeded with sample PDF attachment.`);
+
   console.log('\n===============================================================');
   console.log('🎉 DEMO DATA SEEDING COMPLETE!');
   console.log('===============================================================');
   console.log('Demo Credentials for Presentation:');
   console.log('  🛡️ ADMIN:        admin.demo@belajarku.com / password123');
   console.log('  👨‍👩‍👧 PARENT:       parent.demo@belajarku.com / password123');
+  console.log('  🏫 INSTITUTION:  kepsek.sdn01@belajarku.com / password123');
   console.log('  👩‍🏫 TUTOR (PAUD): tutor.paud@belajarku.com / password123');
   console.log('  👨‍🏫 TUTOR (SMP):  tutor.smp@belajarku.com  / password123');
+  console.log('  📑 TUTOR (ADMIN): tutor.admin@belajarku.com / password123');
   console.log('  👨‍🏫 UNVERIFIED:   tutor.unverified@belajarku.com / password123');
   console.log('===============================================================\n');
 }

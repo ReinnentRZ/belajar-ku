@@ -4,11 +4,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   BookOpen,
+  Building2,
   Calendar,
+  CheckCircle,
   CheckCircle2,
   Clock,
+  Download,
+  FileText,
   GraduationCap,
   Plus,
+  RefreshCw,
   ShieldAlert,
   Trash2,
   User,
@@ -20,7 +25,7 @@ import React, { useState } from 'react';
 import { ReportSessionModal } from '../../../components/ReportSessionModal';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../lib/api';
-import { formatDate } from '../../../lib/utils';
+import { formatDate, formatRupiah } from '../../../lib/utils';
 
 export default function ParentDashboardPage() {
   const router = useRouter();
@@ -44,6 +49,13 @@ export default function ParentDashboardPage() {
     sessionTitle?: string;
   }>({ isOpen: false });
 
+  // Modal State for requesting a deliverable revision
+  const [revisionModal, setRevisionModal] = useState<{
+    isOpen: boolean;
+    orderId?: string;
+    notes: string;
+  }>({ isOpen: false, notes: '' });
+
   // Fetch Parent's Students
   const { data: students = [], isLoading: isStudentsLoading } = useQuery({
     queryKey: ['my-students'],
@@ -62,6 +74,16 @@ export default function ParentDashboardPage() {
       return res.data?.data || [];
     },
     enabled: !!user && user.role === 'PARENT',
+  });
+
+  // Fetch Orders (for deliverables and escrow tracking)
+  const { data: myOrders = [], isLoading: isOrdersLoading } = useQuery({
+    queryKey: ['my-orders'],
+    queryFn: async () => {
+      const res = await api.get('/api/v1/orders/mine');
+      return res.data?.data || [];
+    },
+    enabled: !!user && (user.role === 'PARENT' || user.role === 'INSTITUTION'),
   });
 
   // Add Student Mutation
@@ -94,16 +116,61 @@ export default function ParentDashboardPage() {
     },
   });
 
+  // Complete Deliverable Mutation (Escrow Release: 85% to tutor, 15% to platform)
+  const completeDeliverableMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await api.post(`/api/v1/orders/${orderId}/complete-deliverable`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Gagal menyelesaikan pesanan deliverable.');
+    },
+  });
+
+  // Request Revision Mutation
+  const requestRevisionMutation = useMutation({
+    mutationFn: async ({ orderId, notes }: { orderId: string; notes: string }) => {
+      await api.post(`/api/v1/orders/${orderId}/request-revision`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+      setRevisionModal({ isOpen: false, orderId: '', notes: '' });
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Gagal mengajukan revisi.');
+    },
+  });
+
+  // Download Deliverable File Handler
+  const handleDownload = async (orderId: string, fileId: string, fileName: string) => {
+    try {
+      const res = await api.get(`/api/v1/orders/${orderId}/deliverables/${fileId}/download`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      alert('Gagal mengunduh file dokumen.');
+    }
+  };
+
   if (isAuthLoading) {
     return <div className="p-16 text-center text-slate-500">Memuat profil...</div>;
   }
 
-  if (!user || user.role !== 'PARENT') {
+  if (!user || (user.role !== 'PARENT' && user.role !== 'INSTITUTION')) {
     return (
       <div className="max-w-md mx-auto p-12 text-center space-y-4">
-        <h2 className="text-xl font-bold text-slate-800">Akses Khusus Orang Tua</h2>
+        <h2 className="text-xl font-bold text-slate-800">Akses Dashboard</h2>
         <p className="text-sm text-slate-500">
-          Halaman ini khusus untuk orang tua yang mendampingi proses belajar anak.
+          Halaman ini khusus untuk akun Orang Tua Murid atau Pihak Sekolah.
         </p>
         <Link
           href="/login"
@@ -115,6 +182,7 @@ export default function ParentDashboardPage() {
     );
   }
 
+  const deliverableOrders = myOrders.filter((o: any) => o.serviceType === 'DELIVERABLE_BASED');
   const upcomingSessions = sessions.filter((s: any) => s.status === 'SCHEDULED');
   const disputedSessions = sessions.filter((s: any) => s.status === 'DISPUTED');
   const completedSessions = sessions.filter((s: any) => s.status === 'COMPLETED');
@@ -122,27 +190,231 @@ export default function ParentDashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 rounded-3xl p-6 sm:p-10 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div
+        className={`rounded-3xl p-6 sm:p-10 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6 ${
+          user.role === 'INSTITUTION'
+            ? 'bg-gradient-to-r from-indigo-800 via-indigo-700 to-purple-700'
+            : 'bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600'
+        }`}
+      >
         <div className="space-y-1">
           <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm">
-            Portal Orang Tua Belajar-Ku
+            {user.role === 'INSTITUTION' ? '🏫 Portal Administrasi Sekolah' : '👨‍👩‍👧 Portal Orang Tua Belajar-Ku'}
           </span>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Halo, {user.name}! 👨‍👩‍👧
+            Halo, {user.name}!
           </h1>
-          <p className="text-emerald-100 text-sm max-w-lg">
-            Pantau profil ananda, jadwal les mendatang, dan laporan kemajuan belajar yang disusun oleh guru privat.
+          <p className="text-white/90 text-sm max-w-lg">
+            {user.role === 'INSTITUTION'
+              ? `Kelola pesanan modul ajar Kurikulum Merdeka dan penyusunan LPJ Dana BOS untuk ${user.schoolName || 'sekolah Anda'}.`
+              : 'Pantau profil ananda, jadwal les mendatang, dan laporan kemajuan belajar yang disusun oleh guru privat.'}
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddStudentOpen(true)}
-          className="px-5 py-3 rounded-2xl bg-white text-emerald-800 font-bold text-sm shadow-md hover:bg-emerald-50 transition-all flex items-center gap-2 hover:scale-105 shrink-0"
-        >
-          <Plus className="w-5 h-5 text-emerald-600" />
-          Tambah Profil Anak
-        </button>
+        {user.role === 'PARENT' && (
+          <button
+            onClick={() => setIsAddStudentOpen(true)}
+            className="px-5 py-3 rounded-2xl bg-white text-emerald-800 font-bold text-sm shadow-md hover:bg-emerald-50 transition-all flex items-center gap-2 hover:scale-105 shrink-0"
+          >
+            <Plus className="w-5 h-5 text-emerald-600" />
+            <span>Tambah Profil Anak</span>
+          </button>
+        )}
       </div>
+      {/* Deliverable Orders Section (Prominent for Institution or when Deliverable Orders exist) */}
+      {(user.role === 'INSTITUTION' || deliverableOrders.length > 0) && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-600" />
+              Pesanan Dokumen & Administrasi Sekolah ({deliverableOrders.length})
+            </h2>
+            <Link
+              href="/services?type=teacher"
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+            >
+              <span>+ Pesan Dokumen Baru</span>
+            </Link>
+          </div>
+
+          {isOrdersLoading ? (
+            <div className="text-slate-400 text-sm">Memuat daftar pesanan dokumen...</div>
+          ) : deliverableOrders.length === 0 ? (
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-3">
+              <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+              <p className="text-sm text-slate-600 font-medium">
+                Belum ada pesanan dokumen administrasi aktif.
+              </p>
+              <Link
+                href="/services?type=teacher"
+                className="inline-block px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs"
+              >
+                Jelajahi Pojok Administrasi Guru
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {deliverableOrders.map((ord: any) => {
+                const item = ord.items?.[0];
+                const tutorUser = item?.tutor?.user;
+                const status = ord.deliverableStatus || item?.deliverableStatus;
+                const attachments = ord.attachments || [];
+
+                return (
+                  <div
+                    key={ord.id}
+                    className="bg-white rounded-3xl border border-indigo-100 shadow-md p-6 sm:p-8 space-y-6"
+                  >
+                    {/* Header info */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold font-mono text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                            {ord.invoiceNumber}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {formatDate(ord.createdAt)}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 mt-1">
+                          {item?.service?.title || 'Layanan Dokumen Administrasi'}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Penyusun: <strong>{tutorUser?.name}</strong> • Nilai Pesanan: <strong className="text-slate-800">{formatRupiah(ord.totalAmount)}</strong>
+                        </p>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div>
+                        {status === 'AWAITING_DELIVERY' && (
+                          <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-amber-600" /> Sedang Dikerjakan Konsultan
+                          </span>
+                        )}
+                        {status === 'DELIVERED' && (
+                          <span className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                            <FileText className="w-4 h-4 text-blue-600" /> Dokumen Siap Ditinjau
+                          </span>
+                        )}
+                        {status === 'REVISION_REQUESTED' && (
+                          <span className="px-3 py-1.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1.5">
+                            <RefreshCw className="w-4 h-4 text-rose-600" /> Revisi Sedang Diproses ({ord.revisionCount}/{ord.maxRevisions}x)
+                          </span>
+                        )}
+                        {status === 'COMPLETED' && (
+                          <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+                            <CheckCircle className="w-4 h-4 text-emerald-600" /> Dokumen Disetujui (Selesai)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Buyer Instructions & Revision Notes */}
+                    {item?.notes && (
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-1">
+                        <span className="font-bold text-slate-900 block">Instruksi Awal Pemesanan:</span>
+                        <p className="italic text-slate-600">"{item.notes}"</p>
+                      </div>
+                    )}
+
+                    {ord.revisionNotes && (
+                      <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-200 text-xs text-rose-900 space-y-1">
+                        <span className="font-bold block flex items-center gap-1.5 text-rose-800">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Catatan Revisi Terakhir (Revisi ke-{ord.revisionCount}):
+                        </span>
+                        <p className="italic text-rose-700">"{ord.revisionNotes}"</p>
+                      </div>
+                    )}
+
+                    {/* Uploaded Attachments */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Download className="w-4 h-4 text-indigo-600" />
+                        Dokumen Hasil Kerja ({attachments.length} Berkas)
+                      </h4>
+
+                      {attachments.length === 0 ? (
+                        <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 text-xs text-amber-800">
+                          Konsultan belum mengunggah file deliverable. File dokumen akan muncul di sini setelah diunggah.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {attachments.map((att: any) => (
+                            <div
+                              key={att.id}
+                              className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between gap-3 hover:border-indigo-300 transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                  📄
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-slate-800 truncate" title={att.fileName}>
+                                    {att.fileName}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    {(att.fileSize / 1024 / 1024).toFixed(2)} MB • {formatDate(att.createdAt)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(ord.id, att.id, att.fileName)}
+                                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-1 shadow-sm shrink-0 transition-colors"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Unduh</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Escrow Review Actions */}
+                    {(status === 'DELIVERED' || (status === 'REVISION_REQUESTED' && attachments.length > 0)) && (
+                      <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-indigo-50/40 p-4 rounded-2xl">
+                        <div className="text-xs text-slate-600">
+                          <strong className="text-slate-800 font-semibold block">Proteksi Escrow Aktif</strong>
+                          Silakan tinjau berkas dokumen di atas sebelum menyetujui pelepasan dana ke konsultan.
+                        </div>
+
+                        <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
+                          {ord.revisionCount < ord.maxRevisions && (
+                            <button
+                              type="button"
+                              onClick={() => setRevisionModal({ isOpen: true, orderId: ord.id, notes: '' })}
+                              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Ajukan Revisi ({ord.maxRevisions - ord.revisionCount}x tersisa)</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm('Apakah Anda yakin menyetujui dokumen ini? Dana escrow akan diteruskan ke konsultan dan pesanan dinyatakan selesai.')) {
+                                completeDeliverableMutation.mutate(ord.id);
+                              }
+                            }}
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 hover:scale-[1.02]"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Setujui & Selesaikan</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Children Profiles Section */}
       <div className="space-y-4">
@@ -477,6 +749,53 @@ export default function ParentDashboardPage() {
         sessionId={reportModal.sessionId || ''}
         sessionTitle={reportModal.sessionTitle || ''}
       />
+
+      {/* Revision Modal */}
+      {revisionModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-rose-600" />
+              Ajukan Catatan Revisi Dokumen
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Jelaskan bagian dokumen yang perlu diperbaiki atau disesuaikan oleh konsultan. Konsultan akan menerima notifikasi dan mengunggah versi revisi.
+            </p>
+            <textarea
+              rows={4}
+              required
+              value={revisionModal.notes}
+              onChange={(e) => setRevisionModal({ ...revisionModal, notes: e.target.value })}
+              placeholder="Contoh: Pada bagian Capaian Pembelajaran Bab 3, mohon tambahkan indikator asesmen kinerja rubrik skala 1-4..."
+              className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+            />
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRevisionModal({ isOpen: false, orderId: '', notes: '' })}
+                className="px-4 py-2 rounded-xl text-slate-600 text-xs font-semibold hover:bg-slate-100"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={!revisionModal.notes.trim() || requestRevisionMutation.isPending}
+                onClick={() => {
+                  if (revisionModal.orderId && revisionModal.notes.trim()) {
+                    requestRevisionMutation.mutate({
+                      orderId: revisionModal.orderId,
+                      notes: revisionModal.notes,
+                    });
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-500/20 disabled:opacity-50"
+              >
+                {requestRevisionMutation.isPending ? 'Mengirim...' : 'Kirim Catatan Revisi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

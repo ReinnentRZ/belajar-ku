@@ -22,11 +22,17 @@ export class OrdersService {
       throw new BadRequestError('Cart is empty. Add services to cart before checking out.');
     }
 
-    // 1. Prepare slot locking keys & verify slots are not already booked in PostgreSQL
+    // 1. Prepare slot locking keys for SESSION_BASED services
     const locksToAcquire: { key: string; tutorId: string; date: string; time: string }[] = [];
+    let hasDeliverables = false;
 
     for (const item of cart.items) {
-      const slots = item.selectedSlots as unknown as SelectedSlot[];
+      if (item.service.serviceType === 'DELIVERABLE_BASED') {
+        hasDeliverables = true;
+        continue;
+      }
+
+      const slots = (item.selectedSlots as unknown as SelectedSlot[]) || [];
       for (const slot of slots) {
         const slotDate = new Date(`${slot.date}T00:00:00.000Z`);
 
@@ -61,7 +67,6 @@ export class OrdersService {
 
     try {
       for (const lock of locksToAcquire) {
-        // Atomic SET if Not eXists, TTL 900s (15 minutes)
         const result = await redis.set(lock.key, parentId, 'EX', 900, 'NX');
         if (!result) {
           throw new ConflictError(
@@ -82,20 +87,27 @@ export class OrdersService {
             parentId,
             totalAmount,
             status: 'WAITING_PAYMENT',
+            serviceType: hasDeliverables ? 'DELIVERABLE_BASED' : 'SESSION_BASED',
+            deliverableStatus: hasDeliverables ? 'AWAITING_DELIVERY' : null,
           },
         });
 
         for (const item of cart.items) {
+          const isItemDeliverable = item.service.serviceType === 'DELIVERABLE_BASED';
           await tx.orderItem.create({
             data: {
               orderId: order.id,
               serviceId: item.serviceId,
               tutorId: item.service.tutorId,
               studentId: item.studentId,
+              serviceType: item.service.serviceType,
+              deliverableStatus: isItemDeliverable ? 'AWAITING_DELIVERY' : null,
+              notes: item.notes,
+              maxRevisions: item.service.maxRevisions ?? 2,
               priceSnapshot: item.service.price,
-              totalSessions: item.service.sessionCount,
+              totalSessions: isItemDeliverable ? 1 : item.service.sessionCount,
               completedSessions: 0,
-              selectedSlotsSnapshot: item.selectedSlots as unknown as Prisma.InputJsonValue,
+              selectedSlotsSnapshot: (item.selectedSlots as unknown as Prisma.InputJsonValue) || [],
               teachingAddress: item.teachingAddress,
             },
           });
@@ -121,7 +133,6 @@ export class OrdersService {
 
       return createdOrder;
     } catch (error) {
-      // Rollback any acquired Redis locks if checkout or transaction fails
       if (acquiredLocks.length > 0) {
         await Promise.all(acquiredLocks.map((k) => redis.del(k)));
       }
@@ -153,16 +164,17 @@ export class OrdersService {
     }
 
     if (input.paymentStatus === 'FAILED') {
-      // Release locks and mark order CANCELLED
       await prisma.order.update({
         where: { id: order.id },
         data: { status: 'CANCELLED' },
       });
 
       for (const item of order.items) {
-        const slots = item.selectedSlotsSnapshot as unknown as SelectedSlot[];
-        for (const s of slots) {
-          await redis.del(`lock:tutor:${item.tutorId}:slot:${s.date}:${s.startTime}`);
+        if (item.serviceType === 'SESSION_BASED') {
+          const slots = (item.selectedSlotsSnapshot as unknown as SelectedSlot[]) || [];
+          for (const s of slots) {
+            await redis.del(`lock:tutor:${item.tutorId}:slot:${s.date}:${s.startTime}`);
+          }
         }
       }
 
@@ -172,34 +184,41 @@ export class OrdersService {
       };
     }
 
-    // Payment Successful: ACID Transaction to update order & generate booking_sessions
+    // Payment Successful
     const result = await prisma.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
-        data: { status: 'PAID' },
+        data: {
+          status: 'PAID',
+          ...(order.serviceType === 'DELIVERABLE_BASED' && {
+            deliverableStatus: 'AWAITING_DELIVERY',
+          }),
+        },
       });
 
       const generatedSessions = [];
 
       for (const item of order.items) {
-        const slots = item.selectedSlotsSnapshot as unknown as SelectedSlot[];
-        for (let i = 0; i < slots.length; i++) {
-          const slot = slots[i]!;
-          const scheduledDate = new Date(`${slot.date}T00:00:00.000Z`);
+        if (item.serviceType === 'SESSION_BASED') {
+          const slots = (item.selectedSlotsSnapshot as unknown as SelectedSlot[]) || [];
+          for (let i = 0; i < slots.length; i++) {
+            const slot = slots[i]!;
+            const scheduledDate = new Date(`${slot.date}T00:00:00.000Z`);
 
-          const session = await tx.bookingSession.create({
-            data: {
-              orderItemId: item.id,
-              tutorId: item.tutorId,
-              studentId: item.studentId,
-              sessionNumber: i + 1,
-              scheduledDate,
-              startTime: slot.startTime,
-              endTime: slot.endTime,
-              status: 'SCHEDULED',
-            },
-          });
-          generatedSessions.push(session);
+            const session = await tx.bookingSession.create({
+              data: {
+                orderItemId: item.id,
+                tutorId: item.tutorId,
+                studentId: item.studentId!,
+                sessionNumber: i + 1,
+                scheduledDate,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                status: 'SCHEDULED',
+              },
+            });
+            generatedSessions.push(session);
+          }
         }
       }
 
@@ -209,27 +228,76 @@ export class OrdersService {
       };
     });
 
-    // Release Redis locks as per Rule 3 (now permanently stored in PostgreSQL)
+    // Release Redis locks for session-based items
     for (const item of order.items) {
-      const slots = item.selectedSlotsSnapshot as unknown as SelectedSlot[];
-      for (const s of slots) {
-        await redis.del(`lock:tutor:${item.tutorId}:slot:${s.date}:${s.startTime}`);
+      if (item.serviceType === 'SESSION_BASED') {
+        const slots = (item.selectedSlotsSnapshot as unknown as SelectedSlot[]) || [];
+        for (const s of slots) {
+          await redis.del(`lock:tutor:${item.tutorId}:slot:${s.date}:${s.startTime}`);
+        }
       }
     }
 
     return result;
   }
 
-  async getMyOrders(parentId: string) {
+  async getMyOrders(userId: string, role?: string) {
+    if (role === 'TUTOR') {
+      const tutorProfile = await prisma.tutorProfile.findUnique({
+        where: { userId },
+      });
+      if (!tutorProfile) return [];
+
+      return await prisma.order.findMany({
+        where: {
+          items: {
+            some: { tutorId: tutorProfile.id },
+          },
+        },
+        include: {
+          items: {
+            include: {
+              service: true,
+              student: true,
+              bookingSessions: true,
+              attachments: {
+                include: { uploadedBy: true },
+              },
+            },
+          },
+          parent: {
+            select: { id: true, name: true, email: true, phone: true, schoolName: true },
+          },
+          attachments: {
+            include: { uploadedBy: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
     return await prisma.order.findMany({
-      where: { parentId },
+      where: { parentId: userId },
       include: {
         items: {
           include: {
             service: true,
             student: true,
+            tutor: {
+              include: {
+                user: {
+                  select: { id: true, name: true, phone: true, schoolName: true },
+                },
+              },
+            },
             bookingSessions: true,
+            attachments: {
+              include: { uploadedBy: true },
+            },
           },
+        },
+        attachments: {
+          include: { uploadedBy: true },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -244,8 +312,24 @@ export class OrdersService {
           include: {
             service: true,
             student: true,
+            tutor: {
+              include: {
+                user: {
+                  select: { id: true, name: true, email: true, phone: true, schoolName: true },
+                },
+              },
+            },
             bookingSessions: true,
+            attachments: {
+              include: { uploadedBy: true },
+            },
           },
+        },
+        parent: {
+          select: { id: true, name: true, email: true, phone: true, schoolName: true },
+        },
+        attachments: {
+          include: { uploadedBy: true },
         },
       },
     });
@@ -254,7 +338,11 @@ export class OrdersService {
       throw new NotFoundError('Order not found');
     }
 
-    if (role === 'PARENT' && order.parentId !== userId) {
+    const isBuyer = order.parentId === userId;
+    const isSeller = order.items.some((it) => it.tutor.userId === userId);
+    const isAdmin = role === 'ADMIN';
+
+    if (!isBuyer && !isSeller && !isAdmin) {
       throw new ForbiddenError('You do not have access to this order');
     }
 
@@ -284,15 +372,251 @@ export class OrdersService {
       data: { status: 'CANCELLED' },
     });
 
-    // Release Redis slot locks
     for (const item of order.items) {
-      const slots = item.selectedSlotsSnapshot as unknown as SelectedSlot[];
-      for (const s of slots) {
-        await redis.del(`lock:tutor:${item.tutorId}:slot:${s.date}:${s.startTime}`);
+      if (item.serviceType === 'SESSION_BASED') {
+        const slots = (item.selectedSlotsSnapshot as unknown as SelectedSlot[]) || [];
+        for (const s of slots) {
+          await redis.del(`lock:tutor:${item.tutorId}:slot:${s.date}:${s.startTime}`);
+        }
       }
     }
 
     return cancelledOrder;
+  }
+
+  // =========================================================================
+  // Document Escrow & Deliverables Pipeline
+  // =========================================================================
+
+  async saveDeliverableAttachment(
+    tutorUserId: string,
+    orderId: string,
+    fileInfo: { fileName: string; fileUrl: string; fileSize: number; mimeType?: string }
+  ) {
+    const tutorProfile = await prisma.tutorProfile.findUnique({
+      where: { userId: tutorUserId },
+    });
+    if (!tutorProfile) {
+      throw new ForbiddenError('Hanya akun Guru/Mitra Jasa yang dapat mengunggah dokumen hasil kerja.');
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) {
+      throw new NotFoundError('Pesanan tidak ditemukan');
+    }
+
+    if (order.status !== 'PAID') {
+      throw new BadRequestError('Dokumen hanya dapat diunggah untuk pesanan yang telah dibayar (PAID).');
+    }
+
+    const tutorItem = order.items.find((it) => it.tutorId === tutorProfile.id);
+    if (!tutorItem) {
+      throw new ForbiddenError('Anda bukan penyedia jasa untuk pesanan ini.');
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const attachment = await tx.orderAttachment.create({
+        data: {
+          orderId: order.id,
+          orderItemId: tutorItem.id,
+          fileName: fileInfo.fileName,
+          fileUrl: fileInfo.fileUrl,
+          fileSize: fileInfo.fileSize,
+          mimeType: fileInfo.mimeType,
+          uploadedById: tutorUserId,
+        },
+        include: {
+          uploadedBy: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      });
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          deliverableStatus: 'DELIVERED',
+        },
+      });
+
+      await tx.orderItem.update({
+        where: { id: tutorItem.id },
+        data: {
+          deliverableStatus: 'DELIVERED',
+        },
+      });
+
+      return attachment;
+    });
+  }
+
+  async requestRevision(userId: string, orderId: string, notes: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) {
+      throw new NotFoundError('Pesanan tidak ditemukan');
+    }
+
+    if (order.parentId !== userId) {
+      throw new ForbiddenError('Hanya pemesan yang dapat mengajukan revisi.');
+    }
+
+    if (order.status !== 'PAID') {
+      throw new BadRequestError('Pesanan belum dibayar.');
+    }
+
+    if (order.deliverableStatus !== 'DELIVERED') {
+      throw new BadRequestError('Revisi hanya dapat diajukan setelah penyedia mengunggah dokumen deliverable.');
+    }
+
+    if (order.revisionCount >= order.maxRevisions) {
+      throw new BadRequestError(`Batas maksimal revisi (${order.maxRevisions}x) telah tercapai.`);
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          revisionCount: order.revisionCount + 1,
+          revisionNotes: notes,
+          deliverableStatus: 'REVISION_REQUESTED',
+        },
+        include: {
+          attachments: true,
+          items: true,
+        },
+      });
+
+      await tx.orderItem.updateMany({
+        where: { orderId: order.id },
+        data: {
+          revisionCount: order.revisionCount + 1,
+          revisionNotes: notes,
+          deliverableStatus: 'REVISION_REQUESTED',
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  async completeDeliverable(userId: string, userRole: string, orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { tutor: true },
+        },
+      },
+    });
+    if (!order) {
+      throw new NotFoundError('Pesanan tidak ditemukan');
+    }
+
+    if (userRole !== 'ADMIN' && order.parentId !== userId) {
+      throw new ForbiddenError('Hanya pemesan atau Admin yang berhak menyetujui dan menyelesaikan pesanan ini.');
+    }
+
+    if (order.status !== 'PAID') {
+      throw new BadRequestError('Pesanan belum dibayar.');
+    }
+
+    if (order.deliverableStatus !== 'DELIVERED' && order.deliverableStatus !== 'REVISION_REQUESTED') {
+      throw new BadRequestError('Dokumen hasil kerja belum diserahkan oleh penyedia.');
+    }
+
+    // Escrow split: 85% to tutor, 15% platform commission
+    return await prisma.$transaction(async (tx) => {
+      const updatedOrder = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          deliverableStatus: 'COMPLETED',
+        },
+      });
+
+      await tx.orderItem.updateMany({
+        where: { orderId: order.id },
+        data: {
+          deliverableStatus: 'COMPLETED',
+        },
+      });
+
+      for (const item of order.items) {
+        const grossAmount = item.priceSnapshot;
+        const platformFeePercent = Number(item.platformFeePercent) || 15;
+        const platformFee = (grossAmount * platformFeePercent) / 100;
+        const tutorNet = grossAmount - platformFee;
+
+        // Atomically increment tutor's wallet balance
+        await tx.tutorProfile.update({
+          where: { id: item.tutorId },
+          data: {
+            walletBalance: { increment: tutorNet },
+          },
+        });
+
+        // Record wallet mutation
+        await tx.walletMutation.create({
+          data: {
+            tutorId: item.tutorId,
+            orderId: order.id,
+            type: 'CREDIT_FROM_DELIVERABLE',
+            grossAmount,
+            feeDeducted: platformFee,
+            netAmount: tutorNet,
+            amount: tutorNet,
+          },
+        });
+
+        // Record platform revenue ledger
+        await tx.platformRevenueLedger.create({
+          data: {
+            orderId: order.id,
+            tutorId: item.tutorId,
+            grossAmount,
+            platformFee,
+          },
+        });
+      }
+
+      return updatedOrder;
+    });
+  }
+
+  async getDeliverableFile(userId: string, userRole: string, orderId: string, fileId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { tutor: true },
+        },
+      },
+    });
+    if (!order) {
+      throw new NotFoundError('Pesanan tidak ditemukan');
+    }
+
+    const isBuyer = order.parentId === userId;
+    const isSeller = order.items.some((it) => it.tutor.userId === userId);
+    const isAdmin = userRole === 'ADMIN';
+
+    if (!isBuyer && !isSeller && !isAdmin) {
+      throw new ForbiddenError('Anda tidak memiliki akses untuk mengunduh dokumen dari pesanan ini.');
+    }
+
+    const attachment = await prisma.orderAttachment.findFirst({
+      where: { id: fileId, orderId },
+    });
+    if (!attachment) {
+      throw new NotFoundError('File lampiran tidak ditemukan');
+    }
+
+    return attachment;
   }
 }
 

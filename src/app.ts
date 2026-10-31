@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import { Prisma } from '@prisma/client';
 import Fastify, { FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
@@ -32,6 +33,27 @@ export function buildApp(): FastifyInstance {
     secret: env.JWT_SECRET,
   });
 
+  // Multipart File Upload Plugin (50MB Limit)
+  app.register(multipart, {
+    limits: {
+      fileSize: 52428800, // 50MB in bytes
+      files: 5,
+    },
+  });
+
+  // Root Welcome Route
+  app.get('/', async () => {
+    return {
+      success: true,
+      name: 'Belajar-Ku API',
+      version: '1.0.0',
+      description: 'Production REST API for Tutoring Marketplace & School Administration Platform',
+      health: '/health',
+      endpoints: '/api/v1',
+      frontend: 'http://localhost:3000',
+    };
+  });
+
   // Health Check
   app.get('/health', async () => {
     return {
@@ -58,6 +80,14 @@ export function buildApp(): FastifyInstance {
 
   // Centralized Global Error Handler
   app.setErrorHandler((error, _request, reply) => {
+    // 0. Multipart Oversized File Error
+    if ((error as any).code === 'FST_REQ_FILE_TOO_LARGE' || (error as any).statusCode === 413) {
+      return reply.status(413).send({
+        success: false,
+        message: 'Ukuran file melebihi batas maksimal 50MB (52,428,800 bytes)',
+      });
+    }
+
     // 1. Zod Validation Errors
     if (error instanceof ZodError) {
       return reply.status(400).send({

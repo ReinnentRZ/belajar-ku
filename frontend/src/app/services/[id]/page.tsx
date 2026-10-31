@@ -4,13 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Award,
   BookOpen,
+  Building2,
   Calendar,
   CheckCircle2,
   Clock,
+  FileText,
   GraduationCap,
   Heart,
   MapPin,
   Plus,
+  RefreshCw,
   ShieldCheck,
   ShoppingCart,
   Sparkles,
@@ -32,6 +35,7 @@ export default function ServiceDetailPage() {
 
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [teachingAddress, setTeachingAddress] = useState('');
+  const [deliverableNotes, setDeliverableNotes] = useState('');
   const [selectedSlots, setSelectedSlots] = useState<
     Array<{ date: string; startTime: string; endTime: string }>
   >([]);
@@ -110,33 +114,38 @@ export default function ServiceDetailPage() {
       return;
     }
 
-    if (user.role !== 'PARENT') {
-      setErrorMsg('Hanya akun Orang Tua yang dapat memesan les.');
+    if (user.role !== 'PARENT' && user.role !== 'INSTITUTION') {
+      setErrorMsg('Hanya akun Orang Tua atau Pihak Sekolah yang dapat memesan layanan ini.');
       return;
     }
 
-    if (!selectedStudentId) {
-      setErrorMsg('Pilih profil anak yang akan mengikuti les.');
-      return;
-    }
+    const isDeliverable = service.serviceType === 'DELIVERABLE_BASED' || service.category?.categoryGroup === 'ADMINISTRASI_GURU';
 
-    if (selectedSlots.length !== service.sessionCount) {
-      setErrorMsg(`Pilih tepat ${service.sessionCount} jadwal sesi belajar.`);
-      return;
-    }
+    if (!isDeliverable) {
+      if (!selectedStudentId) {
+        setErrorMsg('Pilih profil anak yang akan mengikuti les.');
+        return;
+      }
 
-    if (service.teachingMode === 'OFFLINE_VISIT' && !teachingAddress.trim()) {
-      setErrorMsg('Masukkan alamat lengkap rumah untuk kunjungan guru.');
-      return;
+      if (selectedSlots.length !== service.sessionCount) {
+        setErrorMsg(`Pilih tepat ${service.sessionCount} jadwal sesi belajar.`);
+        return;
+      }
+
+      if (service.teachingMode === 'OFFLINE_VISIT' && !teachingAddress.trim()) {
+        setErrorMsg('Masukkan alamat lengkap rumah untuk kunjungan guru.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
     try {
       await api.post('/api/v1/cart', {
         serviceId: service.id,
-        studentId: selectedStudentId,
-        selectedSlots,
-        teachingAddress: service.teachingMode === 'OFFLINE_VISIT' ? teachingAddress : undefined,
+        studentId: isDeliverable ? undefined : selectedStudentId,
+        selectedSlots: isDeliverable ? [] : selectedSlots,
+        notes: isDeliverable ? deliverableNotes : undefined,
+        teachingAddress: !isDeliverable && service.teachingMode === 'OFFLINE_VISIT' ? teachingAddress : undefined,
       });
 
       router.push('/cart');
@@ -182,62 +191,104 @@ export default function ServiceDetailPage() {
         {/* Left Column: Details & Qualifications */}
         <div className="lg:col-span-2 space-y-6">
           {/* Main Title Card */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
-                {service.category?.name}
-              </span>
-              <span
-                className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
-                  service.teachingMode === 'ONLINE'
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                }`}
-              >
-                {service.teachingMode === 'ONLINE' ? (
-                  <>
-                    <Video className="w-3.5 h-3.5" /> Online (Tatap Muka Virtual)
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-3.5 h-3.5" /> Guru Datang ke Rumah (Offline)
-                  </>
-                )}
-              </span>
-            </div>
+          {(() => {
+            const isDeliverable = service.serviceType === 'DELIVERABLE_BASED' || service.category?.categoryGroup === 'ADMINISTRASI_GURU';
+            return (
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                    isDeliverable
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      : 'bg-brand-50 text-brand-700 border-brand-200'
+                  }`}>
+                    {service.category?.name}
+                  </span>
+                  {isDeliverable ? (
+                    <>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5 text-purple-600" /> Jasa Dokumen
+                      </span>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" /> Estimasi {service.estimatedDays || 3} Hari Kerja
+                      </span>
+                    </>
+                  ) : (
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
+                        service.teachingMode === 'ONLINE'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}
+                    >
+                      {service.teachingMode === 'ONLINE' ? (
+                        <>
+                          <Video className="w-3.5 h-3.5" /> Online (Tatap Muka Virtual)
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="w-3.5 h-3.5" /> Guru Datang ke Rumah (Offline)
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {service.title}
-            </h1>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  {service.title}
+                </h1>
 
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed whitespace-pre-line">
-              {service.description}
-            </p>
+                <p className="text-slate-600 text-sm sm:text-base leading-relaxed whitespace-pre-line">
+                  {service.description}
+                </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <Clock className="w-5 h-5 text-brand-600" />
-                <div>
-                  <div className="text-[11px] text-slate-400 font-semibold uppercase">Durasi</div>
-                  <div className="text-sm font-bold text-slate-800">{service.durationMinutes} Menit / Sesi</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <Clock className={`w-5 h-5 ${isDeliverable ? 'text-indigo-600' : 'text-brand-600'}`} />
+                    <div>
+                      <div className="text-[11px] text-slate-400 font-semibold uppercase">
+                        {isDeliverable ? 'Waktu Pengerjaan' : 'Durasi'}
+                      </div>
+                      <div className="text-sm font-bold text-slate-800">
+                        {isDeliverable ? `${service.estimatedDays || 3} Hari Kerja` : `${service.durationMinutes} Menit / Sesi`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    {isDeliverable ? (
+                      <FileText className="w-5 h-5 text-purple-600" />
+                    ) : (
+                      <BookOpen className="w-5 h-5 text-accent-600" />
+                    )}
+                    <div>
+                      <div className="text-[11px] text-slate-400 font-semibold uppercase">
+                        {isDeliverable ? 'Format File' : 'Jumlah Pertemuan'}
+                      </div>
+                      <div className="text-sm font-bold text-slate-800">
+                        {isDeliverable
+                          ? service.deliverableFormats?.join(', ') || 'DOCX, PDF'
+                          : `Paket ${service.sessionCount} Sesi`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    {isDeliverable ? (
+                      <RefreshCw className="w-5 h-5 text-emerald-600" />
+                    ) : (
+                      <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    )}
+                    <div>
+                      <div className="text-[11px] text-slate-400 font-semibold uppercase">
+                        {isDeliverable ? 'Garansi Revisi' : 'Jaminan Belajar'}
+                      </div>
+                      <div className="text-sm font-bold text-slate-800">
+                        {isDeliverable ? `Maks. ${service.maxRevisions || 2}x Gratis` : 'Escrow Aman'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5">
-                <BookOpen className="w-5 h-5 text-accent-600" />
-                <div>
-                  <div className="text-[11px] text-slate-400 font-semibold uppercase">Jumlah Pertemuan</div>
-                  <div className="text-sm font-bold text-slate-800">Paket {service.sessionCount} Sesi</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <div>
-                  <div className="text-[11px] text-slate-400 font-semibold uppercase">Jaminan Belajar</div>
-                  <div className="text-sm font-bold text-slate-800">Escrow Aman</div>
-                </div>
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Syllabus Highlights */}
           {service.syllabusHighlights && service.syllabusHighlights.length > 0 && (
@@ -345,181 +396,265 @@ export default function ServiceDetailPage() {
 
         {/* Right Column: Interactive Scheduling & Cart Checkout */}
         <div className="space-y-6">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-md space-y-6 sticky top-24">
-            <div>
-              <div className="text-xs text-slate-400 uppercase font-semibold">Total Biaya Paket</div>
-              <div className="text-3xl font-black text-brand-700 mt-1">
-                {formatRupiah(service.price)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Sudah termasuk {service.sessionCount} sesi les dan laporan belajar berkala.
-              </p>
-            </div>
-
-            {errorMsg && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
-                {errorMsg}
-              </div>
-            )}
-
-            {/* Select Student Profile */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                1. Pilih Profil Anak
-              </label>
-              {user ? (
-                students.length > 0 ? (
-                  <select
-                    value={selectedStudentId}
-                    onChange={(e) => setSelectedStudentId(e.target.value)}
-                    className="w-full py-2.5 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
-                  >
-                    <option value="">-- Pilih Profil Anak --</option>
-                    {students.map((st: any) => (
-                      <option key={st.id} value={st.id}>
-                        {st.studentName} ({st.gradeLevel})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="text-xs text-slate-500 bg-amber-50 p-3 rounded-xl border border-amber-200">
-                    Belum ada profil anak.{' '}
-                    <Link href="/parent/dashboard" className="font-bold text-amber-700 underline">
-                      Tambah profil anak di dashboard
-                    </Link>
-                  </div>
-                )
-              ) : (
-                <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <Link href="/login" className="font-bold text-brand-600 underline">
-                    Masuk ke akun Anda
-                  </Link>{' '}
-                  untuk memilih profil anak.
-                </div>
-              )}
-            </div>
-
-            {/* Select Available Slots */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  2. Pilih {service.sessionCount} Jadwal Sesi
-                </label>
-                <span className="text-xs font-semibold text-brand-600">
-                  {selectedSlots.length} / {service.sessionCount} Terpilih
-                </span>
-              </div>
-
-              {/* Time slot picker */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
+          {(() => {
+            const isDeliverable = service.serviceType === 'DELIVERABLE_BASED' || service.category?.categoryGroup === 'ADMINISTRASI_GURU';
+            return (
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-md space-y-6 sticky top-24">
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-500 block mb-1">
-                    Pilih Tanggal:
-                  </span>
-                  <input
-                    type="date"
-                    min={new Date().toISOString().split('T')[0]}
-                    value={newSlotDate}
-                    onChange={(e) => setNewSlotDate(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
-                  />
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-slate-500 block mb-1">
-                    Jam Tersedia Guru:
-                  </span>
-                  <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto">
-                    {availabilities.length === 0 ? (
-                      <div className="text-xs text-slate-400 italic">Jadwal guru fleksibel</div>
-                    ) : (
-                      availabilities.map((av: any) => {
-                        const isChosen =
-                          selectedAvailTime?.startTime === av.startTime &&
-                          selectedAvailTime?.endTime === av.endTime;
-
-                        return (
-                          <button
-                            key={av.id}
-                            type="button"
-                            onClick={() => setSelectedAvailTime({ startTime: av.startTime, endTime: av.endTime })}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between border transition-all ${
-                              isChosen
-                                ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-                                : 'bg-white text-slate-700 border-slate-200 hover:border-brand-400'
-                            }`}
-                          >
-                            <span>{DAY_NAMES[av.dayOfWeek] || `Hari ${av.dayOfWeek}`}</span>
-                            <span className="font-semibold">{av.startTime} - {av.endTime}</span>
-                          </button>
-                        );
-                      })
-                    )}
+                  <div className="text-xs text-slate-400 uppercase font-semibold">
+                    {isDeliverable ? 'Biaya Layanan Dokumen' : 'Total Biaya Paket'}
                   </div>
+                  <div className={`text-3xl font-black mt-1 ${isDeliverable ? 'text-indigo-700' : 'text-brand-700'}`}>
+                    {formatRupiah(service.price)}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {isDeliverable
+                      ? `Layanan dokumen tuntas siap pakai, termasuk garansi ${service.maxRevisions || 2}x revisi.`
+                      : `Sudah termasuk ${service.sessionCount} sesi les dan laporan belajar berkala.`}
+                  </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleAddSlot}
-                  className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Tambahkan ke Jadwal Sesi
-                </button>
-              </div>
+                {errorMsg && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                    {errorMsg}
+                  </div>
+                )}
 
-              {/* List of chosen slots */}
-              {selectedSlots.length > 0 && (
-                <div className="space-y-1.5">
-                  {selectedSlots.map((slot, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900"
-                    >
-                      <span className="font-semibold">
-                        Sesi {idx + 1}: {slot.date} ({slot.startTime} - {slot.endTime})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSlot(idx)}
-                        className="text-rose-600 font-bold hover:underline"
-                      >
-                        Batal
-                      </button>
+                {isDeliverable ? (
+                  <div className="space-y-5">
+                    {/* Deliverable Specifications Card */}
+                    <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-100 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600 font-semibold flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                          Estimasi Pengerjaan:
+                        </span>
+                        <span className="font-bold text-slate-900">{service.estimatedDays || 3} Hari Kerja</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600 font-semibold flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                          Format Output:
+                        </span>
+                        <div className="flex items-center gap-1 font-mono font-bold text-indigo-700">
+                          {(service.deliverableFormats && service.deliverableFormats.length > 0
+                            ? service.deliverableFormats
+                            : ['DOCX', 'PDF']
+                          ).map((fmt: string) => (
+                            <span key={fmt} className="px-1.5 py-0.5 bg-white border border-indigo-200 rounded text-[10px]">
+                              .{fmt.toLowerCase()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600 font-semibold flex items-center gap-1.5">
+                          <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
+                          Garansi Revisi:
+                        </span>
+                        <span className="font-bold text-emerald-700">{service.maxRevisions || 2}x Bebas Biaya</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-indigo-100">
+                        <span className="text-slate-600 font-semibold flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                          Proteksi Escrow:
+                        </span>
+                        <span className="font-bold text-indigo-800">100% Aman Hingga Selesai</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Offline Teaching Address */}
-            {service.teachingMode === 'OFFLINE_VISIT' && (
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  3. Alamat Rumah untuk Kunjungan
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  value={teachingAddress}
-                  onChange={(e) => setTeachingAddress(e.target.value)}
-                  placeholder="Jl. Mawar No. 15, RT 02/05, Kelurahan..."
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
+                    {/* Instructions Textarea */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Instruksi & Catatan Khusus Pengerjaan
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={deliverableNotes}
+                        onChange={(e) => setDeliverableNotes(e.target.value)}
+                        placeholder="Contoh: Mohon susun Modul Ajar IPAS Kelas 4 Bab Tumbuhan Sumber Kehidupan di Bumi, sertakan lembar kerja siswa (LKPD) berbasis eksperimen..."
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Sampaikan detail sekolah, kurikulum, topik spesifik, atau instruksi pendukung lainnya.
+                      </p>
+                    </div>
+
+                    {/* Add Deliverable to Cart Button */}
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={isSubmitting}
+                      className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 hover:scale-[1.02] disabled:opacity-50"
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      {isSubmitting ? 'Menyimpan...' : 'Pesan Dokumen Sekarang'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Select Student Profile */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        1. Pilih Profil Anak
+                      </label>
+                      {user ? (
+                        students.length > 0 ? (
+                          <select
+                            value={selectedStudentId}
+                            onChange={(e) => setSelectedStudentId(e.target.value)}
+                            className="w-full py-2.5 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                          >
+                            <option value="">-- Pilih Profil Anak --</option>
+                            {students.map((st: any) => (
+                              <option key={st.id} value={st.id}>
+                                {st.studentName} ({st.gradeLevel})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-xs text-slate-500 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                            Belum ada profil anak.{' '}
+                            <Link href="/parent/dashboard" className="font-bold text-amber-700 underline">
+                              Tambah profil anak di dashboard
+                            </Link>
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                          <Link href="/login" className="font-bold text-brand-600 underline">
+                            Masuk ke akun Anda
+                          </Link>{' '}
+                          untuk memilih profil anak.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Select Available Slots */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          2. Pilih {service.sessionCount} Jadwal Sesi
+                        </label>
+                        <span className="text-xs font-semibold text-brand-600">
+                          {selectedSlots.length} / {service.sessionCount} Terpilih
+                        </span>
+                      </div>
+
+                      {/* Time slot picker */}
+                      <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
+                        <div>
+                          <span className="text-[11px] font-semibold text-slate-500 block mb-1">
+                            Pilih Tanggal:
+                          </span>
+                          <input
+                            type="date"
+                            min={new Date().toISOString().split('T')[0]}
+                            value={newSlotDate}
+                            onChange={(e) => setNewSlotDate(e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <span className="text-[11px] font-semibold text-slate-500 block mb-1">
+                            Jam Tersedia Guru:
+                          </span>
+                          <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto">
+                            {availabilities.length === 0 ? (
+                              <div className="text-xs text-slate-400 italic">Jadwal guru fleksibel</div>
+                            ) : (
+                              availabilities.map((av: any) => {
+                                const isChosen =
+                                  selectedAvailTime?.startTime === av.startTime &&
+                                  selectedAvailTime?.endTime === av.endTime;
+
+                                return (
+                                  <button
+                                    key={av.id}
+                                    type="button"
+                                    onClick={() => setSelectedAvailTime({ startTime: av.startTime, endTime: av.endTime })}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between border transition-all ${
+                                      isChosen
+                                        ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:border-brand-400'
+                                    }`}
+                                  >
+                                    <span>{DAY_NAMES[av.dayOfWeek] || `Hari ${av.dayOfWeek}`}</span>
+                                    <span className="font-semibold">{av.startTime} - {av.endTime}</span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAddSlot}
+                          className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Tambahkan ke Jadwal Sesi
+                        </button>
+                      </div>
+
+                      {/* List of chosen slots */}
+                      {selectedSlots.length > 0 && (
+                        <div className="space-y-1.5">
+                          {selectedSlots.map((slot, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900"
+                            >
+                              <span className="font-semibold">
+                                Sesi {idx + 1}: {slot.date} ({slot.startTime} - {slot.endTime})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlot(idx)}
+                                className="text-rose-600 font-bold hover:underline"
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Offline Teaching Address */}
+                    {service.teachingMode === 'OFFLINE_VISIT' && (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          3. Alamat Rumah untuk Kunjungan
+                        </label>
+                        <textarea
+                          rows={2}
+                          required
+                          value={teachingAddress}
+                          onChange={(e) => setTeachingAddress(e.target.value)}
+                          placeholder="Jl. Mawar No. 15, RT 02/05, Kelurahan..."
+                          className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        />
+                      </div>
+                    )}
+
+                    {/* Add to Cart Button */}
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={isSubmitting}
+                      className="w-full py-3.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md shadow-brand-500/20 transition-all flex items-center justify-center gap-2 hover:scale-[1.02] disabled:opacity-50"
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      {isSubmitting ? 'Menyimpan...' : 'Tambah ke Keranjang'}
+                    </button>
+                  </>
+                )}
               </div>
-            )}
-
-            {/* Add to Cart Button */}
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md shadow-brand-500/20 transition-all flex items-center justify-center gap-2 hover:scale-[1.02] disabled:opacity-50"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {isSubmitting ? 'Menyimpan...' : 'Tambah ke Keranjang'}
-            </button>
-          </div>
+            );
+          })()}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import prisma from '../../config/database.js';
-import { ConflictError, NotFoundError, UnauthorizedError } from '../../utils/errors.js';
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../utils/errors.js';
 import { LoginInput, RegisterInput } from './auth.schema.js';
 
 export class AuthService {
@@ -24,6 +24,7 @@ export class AuthService {
           phone: input.phone,
           passwordHash,
           role: input.role,
+          schoolName: input.schoolName,
         },
       });
 
@@ -38,7 +39,7 @@ export class AuthService {
             walletBalance: 0,
           },
         });
-      } else if (input.role === 'PARENT') {
+      } else if (input.role === 'PARENT' || input.role === 'INSTITUTION') {
         await tx.cart.create({
           data: {
             parentId: user.id,
@@ -52,6 +53,7 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        schoolName: user.schoolName,
         createdAt: user.createdAt,
       };
     });
@@ -66,6 +68,10 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email or password');
     }
 
+    if (!user.isActive) {
+      throw new ForbiddenError('Akun Anda telah dinonaktifkan atau disuspend oleh Administrator');
+    }
+
     const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedError('Invalid email or password');
@@ -77,6 +83,7 @@ export class AuthService {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      schoolName: user.schoolName,
     };
   }
 

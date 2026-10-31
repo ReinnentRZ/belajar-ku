@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Calendar, Clock, Filter, GraduationCap, Heart, MapPin, Search, ShieldCheck, Sparkles, User, Video } from 'lucide-react';
+import { BookOpen, Building2, Calendar, Clock, FileText, Filter, GraduationCap, Heart, MapPin, RefreshCw, Search, ShieldCheck, Sparkles, User, Video } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import React, { Suspense, useState } from 'react';
@@ -10,9 +10,13 @@ import { formatRupiah } from '../../lib/utils';
 
 function ServicesCatalogContent() {
   const searchParams = useSearchParams();
+  const initialType = searchParams.get('type') || '';
   const initialGrade = searchParams.get('gradeLevel') || '';
   const initialCategoryGroup = searchParams.get('categoryGroup') || '';
 
+  const [portalType, setPortalType] = useState<'all' | 'student' | 'teacher'>(
+    initialType === 'teacher' ? 'teacher' : initialType === 'student' ? 'student' : 'all'
+  );
   const [selectedGrade, setSelectedGrade] = useState(initialGrade);
   const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(initialCategoryGroup);
   const [selectedMode, setSelectedMode] = useState('');
@@ -29,9 +33,10 @@ function ServicesCatalogContent() {
 
   // Fetch Services
   const { data: servicesData, isLoading } = useQuery({
-    queryKey: ['services', selectedGrade, selectedCategoryGroup, selectedMode, searchQuery],
+    queryKey: ['services', portalType, selectedGrade, selectedCategoryGroup, selectedMode, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
+      if (portalType !== 'all') params.append('type', portalType);
       if (selectedGrade) params.append('gradeLevel', selectedGrade);
       if (selectedCategoryGroup) params.append('categoryGroup', selectedCategoryGroup);
       if (selectedMode) params.append('teachingMode', selectedMode);
@@ -46,18 +51,86 @@ function ServicesCatalogContent() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+      {/* Portal Switcher Tabs */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-100 p-1.5 rounded-2xl">
+        <div className="grid grid-cols-3 w-full sm:w-auto gap-1">
+          <button
+            onClick={() => setPortalType('all')}
+            className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+              portalType === 'all'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            🌟 Semua Layanan
+          </button>
+          <button
+            onClick={() => setPortalType('student')}
+            className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+              portalType === 'student'
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Les Privat Siswa (Sesi)</span>
+          </button>
+          <button
+            onClick={() => setPortalType('teacher')}
+            className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+              portalType === 'teacher'
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Layanan Dokumen & Modul Guru</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-500 font-medium px-3 hidden sm:block">
+          {portalType === 'teacher'
+            ? 'Menampilkan modul ajar Kurikulum Merdeka & LPJ Dana BOS'
+            : portalType === 'student'
+            ? 'Menampilkan les privat tatap muka & online siswa'
+            : 'Menampilkan seluruh katalog les privat siswa & dokumen administrasi guru'}
+        </div>
+      </div>
+
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600 rounded-3xl p-6 sm:p-10 text-white shadow-lg">
-        <div className="max-w-2xl space-y-2">
+      <div
+        className={`rounded-3xl p-6 sm:p-10 text-white shadow-lg transition-colors ${
+          portalType === 'teacher'
+            ? 'bg-gradient-to-r from-indigo-800 via-indigo-700 to-purple-700'
+            : portalType === 'student'
+            ? 'bg-gradient-to-r from-emerald-800 via-emerald-600 to-teal-600'
+            : 'bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600'
+        }`}
+      >
+        <div className="max-w-3xl space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Katalog Les Terpercaya</span>
+            <span>
+              {portalType === 'teacher'
+                ? 'Pojok Administrasi Guru & Sekolah'
+                : portalType === 'student'
+                ? 'Katalog Les Privat Murid'
+                : 'Katalog Belajar-Ku Terpadu'}
+            </span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
-            Pilihan Guru Les Privat Terbaik
+            {portalType === 'teacher'
+              ? 'Solusi Dokumen Kurikulum & LPJ Sekolah'
+              : portalType === 'student'
+              ? 'Pilihan Guru Les Privat Terbaik'
+              : 'Pilihan Guru Les & Layanan Administrasi'}
           </h1>
-          <p className="text-brand-100 text-sm sm:text-base leading-relaxed">
-            Spesialisasi bimbingan Calistung PAUD, penguatan mata pelajaran SD & SMP, Literasi Al-Qur'an (BTQ/Tajwid), serta Kelas Khusus Difabel (ABK).
+          <p className="text-white/90 text-sm sm:text-base leading-relaxed">
+            {portalType === 'teacher'
+              ? 'Layanan penyusunan Modul Ajar Kurikulum Merdeka, CP, ATP, LKPD, serta asistensi LPJ BOS siap audit oleh konsultan berpengalaman.'
+              : portalType === 'student'
+              ? 'Spesialisasi bimbingan Calistung PAUD, pelajaran SD & SMP, Literasi Al-Qur\'an (BTQ/Tajwid), serta Kelas Khusus Difabel (ABK).'
+              : 'Temukan guru les privat tatap muka/online maupun konsultan penyusun perangkat kurikulum dan administrasi sekolah Anda.'}
           </p>
         </div>
       </div>
@@ -113,6 +186,7 @@ function ServicesCatalogContent() {
             { id: 'TAJWID', label: '✨ Tajwid & Makhraj' },
             { id: 'MUROJAAH', label: "🕌 Muroja'ah & Tahfidz" },
             { id: 'DIFABEL', label: '🤝 Inklusif / Difabel (ABK)' },
+            { id: 'ADMINISTRASI_GURU', label: '📑 Administrasi Guru / LPJ' },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -177,12 +251,13 @@ function ServicesCatalogContent() {
           <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto text-2xl">
             🔍
           </div>
-          <h3 className="text-xl font-bold text-slate-800">Layanan Les Belum Ditemukan</h3>
+          <h3 className="text-xl font-bold text-slate-800">Layanan Belum Ditemukan</h3>
           <p className="text-sm text-slate-500">
-            Coba ubah kata kunci pencarian atau bersihkan filter jenjang untuk melihat penawaran lainnya.
+            Coba ubah kata kunci pencarian atau bersihkan filter jenjang dan kategori untuk melihat penawaran lainnya.
           </p>
           <button
             onClick={() => {
+              setPortalType('all');
               setSelectedGrade('');
               setSelectedCategoryGroup('');
               setSelectedMode('');
@@ -198,21 +273,33 @@ function ServicesCatalogContent() {
           {services.map((svc: any) => {
             const tutorUser = svc.tutor?.user;
             const category = svc.category;
+            const isDeliverable = svc.serviceType === 'DELIVERABLE_BASED' || category?.categoryGroup === 'ADMINISTRASI_GURU';
             const isQuranic = ['BACA_TULIS_QURAN', 'TAJWID', 'MUROJAAH'].includes(category?.categoryGroup);
             const isDifabel = category?.categoryGroup === 'DIFABEL';
 
             return (
               <div
                 key={svc.id}
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-lg hover:border-brand-300 transition-all duration-300 flex flex-col overflow-hidden group"
+                className={`bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden group ${
+                  isDeliverable ? 'border-indigo-200 hover:border-indigo-400' : 'border-slate-200/90 hover:border-brand-300'
+                }`}
               >
                 {/* Header Badge */}
                 <div className="p-6 pb-4 flex-1 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-1.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        isDeliverable
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-brand-50 text-brand-700 border-brand-200'
+                      }`}>
                         {category?.name || 'Mata Pelajaran'}
                       </span>
+                      {isDeliverable && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                          <FileText className="w-3 h-3 text-purple-600" /> Jasa Dokumen
+                        </span>
+                      )}
                       {isDifabel && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
                           <Heart className="w-3 h-3 text-rose-500" /> Inklusif
@@ -224,26 +311,35 @@ function ServicesCatalogContent() {
                         </span>
                       )}
                     </div>
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
-                        svc.teachingMode === 'ONLINE'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      }`}
-                    >
-                      {svc.teachingMode === 'ONLINE' ? (
-                        <>
-                          <Video className="w-3 h-3" /> Online
-                        </>
-                      ) : (
-                        <>
-                          <MapPin className="w-3 h-3" /> Ke Rumah
-                        </>
-                      )}
-                    </span>
+                    {isDeliverable ? (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shrink-0">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        {svc.estimatedDays || 3} Hari
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
+                          svc.teachingMode === 'ONLINE'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        {svc.teachingMode === 'ONLINE' ? (
+                          <>
+                            <Video className="w-3 h-3" /> Online
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="w-3 h-3" /> Ke Rumah
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
 
-                  <h3 className="text-lg font-bold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-2">
+                  <h3 className={`text-lg font-bold text-slate-900 transition-colors line-clamp-2 ${
+                    isDeliverable ? 'group-hover:text-indigo-600' : 'group-hover:text-brand-600'
+                  }`}>
                     {svc.title}
                   </h3>
 
@@ -251,8 +347,28 @@ function ServicesCatalogContent() {
                     {svc.description}
                   </p>
 
+                  {/* Deliverable Specifications Chips */}
+                  {isDeliverable && svc.deliverableFormats && svc.deliverableFormats.length > 0 && (
+                    <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 font-semibold">Format Output:</span>
+                        <div className="flex items-center gap-1">
+                          {svc.deliverableFormats.map((fmt: string) => (
+                            <span key={fmt} className="px-1.5 py-0.5 rounded bg-white text-slate-700 text-[10px] font-mono font-bold border border-slate-200">
+                              .{fmt.toLowerCase()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 text-emerald-500" />
+                        Garansi {svc.maxRevisions || 2}x Revisi Tanpa Biaya Tambahan
+                      </div>
+                    </div>
+                  )}
+
                   {/* Special Accommodations Highlight */}
-                  {svc.specialAccommodations && (
+                  {!isDeliverable && svc.specialAccommodations && (
                     <div className="bg-amber-50/80 border border-amber-200/60 rounded-xl p-2.5 text-[11px] text-amber-900 flex items-start gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                       <span className="line-clamp-2">
@@ -263,12 +379,14 @@ function ServicesCatalogContent() {
 
                   {/* Tutor Info */}
                   <div className="pt-3 border-t border-slate-100 flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs shrink-0">
-                      <User className="w-4 h-4 text-brand-600" />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                      isDeliverable ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-brand-600'
+                    }`}>
+                      {isDeliverable ? <Building2 className="w-4 h-4" /> : <User className="w-4 h-4" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold text-slate-800 truncate">
-                        {tutorUser?.name || 'Guru Les Belajar-Ku'}
+                        {tutorUser?.name || 'Konsultan Belajar-Ku'}
                       </div>
                       <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
                         {svc.tutor?.teachingCredentials ? (
@@ -277,7 +395,7 @@ function ServicesCatalogContent() {
                             <span className="truncate">{svc.tutor.teachingCredentials}</span>
                           </>
                         ) : (
-                          'Guru Terverifikasi'
+                          'Tutor / Konsultan Terverifikasi'
                         )}
                       </div>
                     </div>
@@ -288,18 +406,24 @@ function ServicesCatalogContent() {
                 <div className="bg-slate-50/80 px-6 py-4 border-t border-slate-100 flex items-center justify-between">
                   <div>
                     <div className="text-[10px] text-slate-400 uppercase font-semibold">
-                      {svc.sessionCount} Sesi ({svc.durationMinutes} Menit / Sesi)
+                      {isDeliverable
+                        ? `Estimasi ${svc.estimatedDays || 3} Hari Kerja`
+                        : `${svc.sessionCount} Sesi (${svc.durationMinutes} Menit / Sesi)`}
                     </div>
-                    <div className="text-base font-black text-brand-700">
+                    <div className={`text-base font-black ${isDeliverable ? 'text-indigo-700' : 'text-brand-700'}`}>
                       {formatRupiah(svc.price)}
                     </div>
                   </div>
 
                   <Link
                     href={`/services/${svc.id}`}
-                    className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-sm transition-all hover:scale-105"
+                    className={`px-4 py-2 rounded-xl text-white font-semibold text-xs shadow-sm transition-all hover:scale-105 ${
+                      isDeliverable
+                        ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
+                        : 'bg-brand-600 hover:bg-brand-700 shadow-brand-500/20'
+                    }`}
                   >
-                    Pilih Jadwal
+                    {isDeliverable ? 'Pesan Dokumen' : 'Pilih Jadwal'}
                   </Link>
                 </div>
               </div>

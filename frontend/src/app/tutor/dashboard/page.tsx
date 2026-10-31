@@ -10,11 +10,15 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  Download,
+  FileText,
   GraduationCap,
   MapPin,
   Plus,
+  RefreshCw,
   ShieldAlert,
   Trash2,
+  Upload,
   User,
   Wallet,
 } from 'lucide-react';
@@ -29,7 +33,7 @@ export default function TutorDashboardPage() {
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'schedule' | 'availability' | 'wallet' | 'profile'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'deliverables' | 'availability' | 'wallet' | 'profile'>('schedule');
 
   // Complete Session Modal State
   const [completeModal, setCompleteModal] = useState<{
@@ -95,6 +99,74 @@ export default function TutorDashboardPage() {
     },
     enabled: !!user && user.role === 'TUTOR',
   });
+
+  // 4. Fetch Tutor Orders (for Deliverables)
+  const { data: myOrders = [], isLoading: isOrdersLoading } = useQuery({
+    queryKey: ['my-tutor-orders'],
+    queryFn: async () => {
+      const res = await api.get('/api/v1/orders/mine');
+      return res.data?.data || [];
+    },
+    enabled: !!user && user.role === 'TUTOR',
+  });
+
+  const deliverableOrders = myOrders.filter((o: any) => o.serviceType === 'DELIVERABLE_BASED');
+  const [uploadingOrderId, setUploadingOrderId] = useState<string | null>(null);
+
+  const handleFileUpload = async (orderId: string, file: File) => {
+    if (!file) return;
+
+    // Strict 50MB per-file validation (52,428,800 bytes)
+    const MAX_SIZE = 52428800;
+    if (file.size > MAX_SIZE) {
+      alert(`Ukuran file "${file.name}" melebihi batas maksimal 50MB (${(file.size / 1024 / 1024).toFixed(1)}MB).`);
+      return;
+    }
+
+    const allowedExtensions = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip'];
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      alert(`Format file "${ext}" tidak didukung. Harap unggah format: .pdf, .docx, .xlsx, .zip`);
+      return;
+    }
+
+    setUploadingOrderId(orderId);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      await api.post(`/api/v1/orders/${orderId}/upload-deliverable`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['my-tutor-orders'] });
+      alert('Dokumen berhasil diunggah!');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal mengunggah file dokumen.';
+      alert(msg);
+    } finally {
+      setUploadingOrderId(null);
+    }
+  };
+
+  const handleDownload = async (orderId: string, fileId: string, fileName: string) => {
+    try {
+      const res = await api.get(`/api/v1/orders/${orderId}/deliverables/${fileId}/download`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      alert('Gagal mengunduh file dokumen.');
+    }
+  };
 
   // Mutation: Complete Session
   const completeSessionMutation = useMutation({
@@ -235,6 +307,18 @@ export default function TutorDashboardPage() {
         >
           <Calendar className="w-4 h-4" />
           Jadwal Mengajar ({sessions.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('deliverables')}
+          className={`py-3 px-4 border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+            activeTab === 'deliverables'
+              ? 'border-brand-600 text-brand-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Dokumen Deliverable ({deliverableOrders.length})
         </button>
 
         <button
@@ -437,6 +521,210 @@ export default function TutorDashboardPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Deliverable Orders */}
+      {activeTab === 'deliverables' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-600" />
+                Pesanan Dokumen & Administrasi Sekolah ({deliverableOrders.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Kelola pengerjaan dokumen, unggah berkas hasil pengerjaan (maksimal 50MB per file), dan pantau persetujuan klien.
+              </p>
+            </div>
+          </div>
+
+          {isOrdersLoading ? (
+            <div className="text-slate-400 text-sm py-8 text-center">Memuat data pesanan dokumen...</div>
+          ) : deliverableOrders.length === 0 ? (
+            <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3">
+              <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+              <div className="text-slate-700 font-bold">Belum Ada Pesanan Dokumen</div>
+              <p className="text-slate-500 text-xs max-w-md mx-auto">
+                Pesanan administrasi guru atau dokumen sekolah dari institusi/guru akan tampil di sini untuk Anda kerjakan dan unggah berkasnya.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {deliverableOrders.map((ord: any) => {
+                const item = ord.items?.[0];
+                const attachments = ord.attachments || [];
+                const clientName = ord.user?.name || ord.user?.email || 'Klien Institusi';
+                const schoolName = ord.user?.schoolName;
+
+                return (
+                  <div
+                    key={ord.id}
+                    className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                            {ord.invoiceNumber || ord.id.slice(0, 8)}
+                          </span>
+                          <span
+                            className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                              ord.deliverableStatus === 'COMPLETED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : ord.deliverableStatus === 'DELIVERED'
+                                ? 'bg-blue-100 text-blue-800'
+                                : ord.deliverableStatus === 'REVISION_REQUESTED'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {ord.deliverableStatus === 'AWAITING_DELIVERY' && 'Menunggu Unggah Hasil'}
+                            {ord.deliverableStatus === 'DELIVERED' && 'Sudah Dikirim (Menunggu Review Klien)'}
+                            {ord.deliverableStatus === 'REVISION_REQUESTED' && 'Permintaan Revisi dari Klien'}
+                            {ord.deliverableStatus === 'COMPLETED' && 'Pekerjaan Selesai & Dana Dicairkan'}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-bold text-slate-900 mt-1">
+                          {item?.service?.title || 'Jasa Administrasi Guru'}
+                        </h3>
+                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                          <span>Pemesan: <strong className="text-slate-800">{clientName}</strong></span>
+                          {schoolName && (
+                            <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">
+                              🏫 {schoolName}
+                            </span>
+                          )}
+                          <span>•</span>
+                          <span>Tanggal Order: {formatDate(ord.createdAt)}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-xs text-slate-400">Total Pembayaran Klien</div>
+                        <div className="text-lg font-black text-slate-900">
+                          {formatRupiah(ord.totalAmount)}
+                        </div>
+                        <div className="text-[11px] text-emerald-600 font-semibold">
+                          Pendapatan Tutor (85%): {formatRupiah(Number(ord.totalAmount) * 0.85)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Notes from Client */}
+                    {item?.notes && (
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-xs">
+                        <div className="font-bold text-slate-700 mb-1">Catatan Kebutuhan dari Klien:</div>
+                        <p className="text-slate-600 whitespace-pre-line">{item.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Revision Request Banner if any */}
+                    {ord.deliverableStatus === 'REVISION_REQUESTED' && ord.revisionNotes && (
+                      <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 text-xs space-y-1">
+                        <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          Permintaan Revisi (Revisi ke-{ord.revisionCount} / {ord.maxRevisions || 2}):
+                        </div>
+                        <p className="text-amber-800 whitespace-pre-line">{ord.revisionNotes}</p>
+                      </div>
+                    )}
+
+                    {/* Attachment List */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Berkas Deliverable Terunggah ({attachments.length})
+                      </h4>
+
+                      {attachments.length === 0 ? (
+                        <div className="text-xs text-slate-400 italic">
+                          Belum ada berkas yang diunggah untuk pesanan ini.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {attachments.map((att: any) => (
+                            <div
+                              key={att.id}
+                              className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition"
+                            >
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
+                                <div className="truncate">
+                                  <div className="text-xs font-semibold text-slate-800 truncate" title={att.fileName}>
+                                    {att.fileName}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    {(att.fileSize / 1024 / 1024).toFixed(2)} MB • {formatDate(att.uploadedAt)}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleDownload(ord.id, att.id, att.fileName)}
+                                className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-xl transition shrink-0 ml-2"
+                                title="Unduh Berkas"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload Box (Only if not completed) */}
+                    {ord.deliverableStatus !== 'COMPLETED' && (
+                      <div className="bg-indigo-50/50 rounded-2xl p-5 border border-dashed border-indigo-200 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                              <Upload className="w-4 h-4 text-indigo-600" />
+                              Unggah Berkas Hasil Pekerjaan (Maks. 50MB per file)
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              Format didukung: <code>.pdf</code>, <code>.docx</code>, <code>.xlsx</code>, <code>.zip</code>. Berkas akan langsung tersimpan secara aman di volume persistent server.
+                            </div>
+                          </div>
+
+                          <label
+                            className={`cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm shrink-0 ${
+                              uploadingOrderId === ord.id
+                                ? 'bg-indigo-300 text-white cursor-not-allowed'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            }`}
+                          >
+                            {uploadingOrderId === ord.id ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                Mengunggah...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                Pilih Berkas
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              disabled={uploadingOrderId === ord.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleFileUpload(ord.id, file);
+                                }
+                                e.target.value = '';
+                              }}
+                              className="hidden"
+                              accept=".pdf,.docx,.doc,.xlsx,.xls,.zip"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

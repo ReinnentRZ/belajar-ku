@@ -47,7 +47,7 @@ out/
 !*/.env.production.example
 
 # ------------------------------------------------------------------------------
-# 4. Database, SQLite & Local Storage
+# 4. Database, SQLite & Local Storage Volumes
 # ------------------------------------------------------------------------------
 *.db
 *.db-journal
@@ -58,11 +58,29 @@ prisma/*.db-journal
 prisma/*.sqlite
 prisma/*.sqlite3
 
-# Local user uploads / temporary assets
-uploads/
-*/uploads/
+# Local database volumes
+pgdata/
+*/pgdata/
+redisdata/
+*/redisdata/
+data/
+*/data/
+
+# Local user uploads / temporary assets (preserving structure via .gitkeep)
+uploads/*
+!uploads/deliverables/
+uploads/deliverables/*
+!uploads/deliverables/.gitkeep
+*/uploads/*
+!*/uploads/deliverables/
+*/uploads/deliverables/*
+!*/uploads/deliverables/.gitkeep
 tmp/
 temp/
+
+# Explicitly track essential .gitkeep files
+!uploads/deliverables/.gitkeep
+!scripts/.gitkeep
 
 # ------------------------------------------------------------------------------
 # 5. Vercel & Cloud Deployment Metadata
@@ -81,6 +99,7 @@ docker-compose.override.yaml
 # ------------------------------------------------------------------------------
 *.log
 logs/
+*/logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

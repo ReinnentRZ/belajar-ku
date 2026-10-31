@@ -20,15 +20,6 @@ export class CartService {
   async addToCart(parentId: string, input: AddToCartInput) {
     const cart = await this.getOrCreateCart(parentId);
 
-    // Verify student belongs to this parent
-    const student = await prisma.studentProfile.findUnique({
-      where: { id: input.studentId },
-    });
-
-    if (!student || student.parentId !== parentId) {
-      throw new ForbiddenError('Student does not belong to you');
-    }
-
     // Verify service exists and is active
     const service = await prisma.tutorService.findUnique({
       where: { id: input.serviceId },
@@ -39,23 +30,49 @@ export class CartService {
       throw new BadRequestError('Selected service is not active or does not exist');
     }
 
-    if (service.teachingMode === 'OFFLINE_VISIT' && (!input.teachingAddress || input.teachingAddress.trim().length === 0)) {
-      throw new BadRequestError('Teaching address is required for offline visit tutoring');
-    }
+    if (service.serviceType === 'SESSION_BASED') {
+      if (!input.studentId) {
+        throw new BadRequestError('Student profile must be selected for session-based tutoring');
+      }
 
-    if (input.selectedSlots.length !== service.sessionCount) {
-      throw new BadRequestError(
-        `This service requires exactly ${service.sessionCount} scheduled slot(s), but ${input.selectedSlots.length} were selected`
-      );
+      // Verify student belongs to this parent
+      const student = await prisma.studentProfile.findUnique({
+        where: { id: input.studentId },
+      });
+
+      if (!student || student.parentId !== parentId) {
+        throw new ForbiddenError('Student does not belong to you');
+      }
+
+      if (service.teachingMode === 'OFFLINE_VISIT' && (!input.teachingAddress || input.teachingAddress.trim().length === 0)) {
+        throw new BadRequestError('Teaching address is required for offline visit tutoring');
+      }
+
+      if ((input.selectedSlots || []).length !== service.sessionCount) {
+        throw new BadRequestError(
+          `This service requires exactly ${service.sessionCount} scheduled slot(s), but ${(input.selectedSlots || []).length} were selected`
+        );
+      }
+    } else {
+      // If deliverable based and studentId is provided, verify it if belongs to user
+      if (input.studentId) {
+        const student = await prisma.studentProfile.findUnique({
+          where: { id: input.studentId },
+        });
+        if (student && student.parentId !== parentId) {
+          throw new ForbiddenError('Student does not belong to you');
+        }
+      }
     }
 
     const cartItem = await prisma.cartItem.create({
       data: {
         cartId: cart.id,
         serviceId: input.serviceId,
-        studentId: input.studentId,
-        selectedSlots: input.selectedSlots,
+        studentId: input.studentId || null,
+        selectedSlots: input.selectedSlots || [],
         teachingAddress: input.teachingAddress,
+        notes: input.notes,
       },
       include: {
         service: true,

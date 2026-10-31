@@ -8,7 +8,8 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
-  role: 'PARENT' | 'TUTOR' | 'ADMIN';
+  schoolName?: string;
+  role: 'PARENT' | 'TUTOR' | 'ADMIN' | 'INSTITUTION';
 }
 
 interface AuthContextType {

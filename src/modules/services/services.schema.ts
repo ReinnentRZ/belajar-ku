@@ -8,6 +8,7 @@ export const categoryGroupEnum = z.enum([
   'TAJWID',
   'MUROJAAH',
   'DIFABEL',
+  'ADMINISTRASI_GURU',
 ]);
 
 export const createCategorySchema = z.object({
@@ -22,13 +23,17 @@ export const createCategorySchema = z.object({
 export const createServiceSchema = z.object({
   categoryId: z.string().uuid('Invalid category ID'),
   title: z.string().min(3, 'Title must be at least 3 characters'),
+  serviceType: z.enum(['SESSION_BASED', 'DELIVERABLE_BASED']).optional().default('SESSION_BASED'),
   teachingMode: z.enum(['ONLINE', 'OFFLINE_VISIT']),
-  durationMinutes: z.number().int().positive('Duration must be positive in minutes'),
+  durationMinutes: z.number().int().positive('Duration must be positive in minutes').optional().default(60),
   sessionCount: z.number().int().positive().default(1),
   price: z.number().positive('Price must be greater than zero'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   syllabusHighlights: z.array(z.string()).optional().default([]),
   specialAccommodations: z.string().optional(),
+  estimatedDays: z.number().int().positive().optional(),
+  deliverableFormats: z.array(z.string()).optional().default([]),
+  maxRevisions: z.number().int().min(0).max(10).optional().default(2),
 });
 
 export const updateServiceSchema = createServiceSchema.partial().extend({
@@ -57,6 +62,8 @@ export const searchServicesQuerySchema = z.object({
   categoryGroup: categoryGroupEnum.optional(),
   categorySlug: z.string().optional(),
   teachingMode: z.enum(['ONLINE', 'OFFLINE_VISIT']).optional(),
+  serviceType: z.enum(['SESSION_BASED', 'DELIVERABLE_BASED']).optional(),
+  type: z.enum(['student', 'teacher']).optional(),
   search: z.string().optional(),
   page: z
     .string()

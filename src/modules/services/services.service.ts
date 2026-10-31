@@ -58,13 +58,17 @@ export class ServicesService {
         tutorId: tutorProfile.id,
         categoryId: input.categoryId,
         title: input.title,
+        serviceType: input.serviceType || 'SESSION_BASED',
         teachingMode: input.teachingMode,
-        durationMinutes: input.durationMinutes,
+        durationMinutes: input.durationMinutes ?? 60,
         sessionCount: input.sessionCount,
         price: input.price,
         description: input.description,
         syllabusHighlights: input.syllabusHighlights || [],
         specialAccommodations: input.specialAccommodations,
+        estimatedDays: input.estimatedDays,
+        deliverableFormats: input.deliverableFormats || [],
+        maxRevisions: input.maxRevisions ?? 2,
         isActive: true,
       },
       include: {
@@ -104,6 +108,7 @@ export class ServicesService {
                 name: true,
                 email: true,
                 phone: true,
+                schoolName: true,
               },
             },
             availabilities: {
@@ -147,6 +152,7 @@ export class ServicesService {
       data: {
         ...(input.categoryId && { categoryId: input.categoryId }),
         ...(input.title && { title: input.title }),
+        ...(input.serviceType && { serviceType: input.serviceType }),
         ...(input.teachingMode && { teachingMode: input.teachingMode }),
         ...(input.durationMinutes && { durationMinutes: input.durationMinutes }),
         ...(input.sessionCount && { sessionCount: input.sessionCount }),
@@ -154,6 +160,9 @@ export class ServicesService {
         ...(input.description && { description: input.description }),
         ...(input.syllabusHighlights !== undefined && { syllabusHighlights: input.syllabusHighlights }),
         ...(input.specialAccommodations !== undefined && { specialAccommodations: input.specialAccommodations }),
+        ...(input.estimatedDays !== undefined && { estimatedDays: input.estimatedDays }),
+        ...(input.deliverableFormats !== undefined && { deliverableFormats: input.deliverableFormats }),
+        ...(input.maxRevisions !== undefined && { maxRevisions: input.maxRevisions }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
       },
       include: {
@@ -232,19 +241,7 @@ export class ServicesService {
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const where: {
-      isActive: boolean;
-      teachingMode?: 'ONLINE' | 'OFFLINE_VISIT';
-      category?: {
-        targetGrade?: 'PAUD' | 'TK' | 'SD' | 'SMP';
-        categoryGroup?: 'ACADEMIC' | 'BACA_TULIS_QURAN' | 'TAJWID' | 'MUROJAAH' | 'DIFABEL';
-        slug?: string;
-      };
-      OR?: Array<
-        | { title: { contains: string; mode: 'insensitive' } }
-        | { description: { contains: string; mode: 'insensitive' } }
-      >;
-    } = {
+    const where: any = {
       isActive: true,
     };
 
@@ -252,8 +249,24 @@ export class ServicesService {
       where.teachingMode = query.teachingMode;
     }
 
+    if (query.serviceType) {
+      where.serviceType = query.serviceType;
+    }
+
+    if (query.type === 'teacher') {
+      where.category = {
+        ...(where.category || {}),
+        categoryGroup: 'ADMINISTRASI_GURU',
+      };
+    } else if (query.type === 'student') {
+      where.category = {
+        ...(where.category || {}),
+        categoryGroup: { not: 'ADMINISTRASI_GURU' },
+      };
+    }
+
     if (query.gradeLevel || query.categorySlug || query.categoryGroup) {
-      where.category = {};
+      where.category = where.category || {};
       if (query.gradeLevel) {
         where.category.targetGrade = query.gradeLevel;
       }

@@ -5,9 +5,10 @@ export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   phone: z.string().min(10, 'Phone must be at least 10 characters'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['PARENT', 'TUTOR'], {
-    errorMap: () => ({ message: "Role must be either 'PARENT' or 'TUTOR'" }),
+  role: z.enum(['PARENT', 'TUTOR', 'INSTITUTION'], {
+    errorMap: () => ({ message: "Role must be 'PARENT', 'TUTOR', or 'INSTITUTION'" }),
   }),
+  schoolName: z.string().optional(),
 });
 
 export const loginSchema = z.object({

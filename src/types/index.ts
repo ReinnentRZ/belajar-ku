@@ -1,9 +1,11 @@
-export type Role = 'PARENT' | 'TUTOR' | 'ADMIN';
+export type Role = 'PARENT' | 'TUTOR' | 'ADMIN' | 'INSTITUTION';
 export type GradeLevel = 'PAUD' | 'TK' | 'SD' | 'SMP';
 export type TeachingMode = 'ONLINE' | 'OFFLINE_VISIT';
+export type ServiceType = 'SESSION_BASED' | 'DELIVERABLE_BASED';
+export type DeliverableStatus = 'AWAITING_DELIVERY' | 'DELIVERED' | 'REVISION_REQUESTED' | 'COMPLETED' | 'DISPUTED';
 export type OrderStatus = 'WAITING_PAYMENT' | 'PAID' | 'CANCELLED' | 'EXPIRED';
 export type SessionStatus = 'SCHEDULED' | 'COMPLETED' | 'RESCHEDULED' | 'CANCELLED';
-export type MutationType = 'CREDIT_FROM_SESSION' | 'WITHDRAWAL';
+export type MutationType = 'CREDIT_FROM_SESSION' | 'CREDIT_FROM_DELIVERABLE' | 'WITHDRAWAL';
 
 export interface UserTokenPayload {
   id: string;

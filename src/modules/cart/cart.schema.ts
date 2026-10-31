@@ -16,9 +16,10 @@ export const selectedSlotSchema = z
 
 export const addToCartSchema = z.object({
   serviceId: z.string().uuid('Invalid service ID format'),
-  studentId: z.string().uuid('Invalid student ID format'),
-  selectedSlots: z.array(selectedSlotSchema).min(1, 'At least one slot must be selected'),
+  studentId: z.string().uuid('Invalid student ID format').optional(),
+  selectedSlots: z.array(selectedSlotSchema).optional().default([]),
   teachingAddress: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export const cartItemIdParamSchema = z.object({

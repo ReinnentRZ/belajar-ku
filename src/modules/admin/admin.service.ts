@@ -45,10 +45,26 @@ export class AdminService {
       },
     });
 
-    const heldEscrow = activeSessions.reduce((acc, curr) => {
+    const sessionEscrow = activeSessions.reduce((acc, curr) => {
       const perSession = curr.orderItem.priceSnapshot / curr.orderItem.totalSessions;
       return acc + perSession;
     }, 0);
+
+    const activeDeliverableOrders = await prisma.order.findMany({
+      where: {
+        serviceType: 'DELIVERABLE_BASED',
+        status: 'PAID',
+        deliverableStatus: {
+          in: ['AWAITING_DELIVERY', 'DELIVERED', 'REVISION_REQUESTED', 'DISPUTED'],
+        },
+      },
+      select: {
+        totalAmount: true,
+      },
+    });
+    const deliverableEscrow = activeDeliverableOrders.reduce((acc, curr) => acc + curr.totalAmount, 0);
+
+    const heldEscrow = sessionEscrow + deliverableEscrow;
 
     // 4. Counts
     const [pendingReportsCount, unverifiedTutorsCount, totalOrdersCount, totalUsersCount] =

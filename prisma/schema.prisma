@@ -11,6 +11,7 @@ enum Role {
   PARENT
   TUTOR
   ADMIN
+  INSTITUTION
 }
 
 enum GradeLevel {
@@ -31,6 +32,20 @@ enum CategoryGroup {
   TAJWID
   MUROJAAH
   DIFABEL
+  ADMINISTRASI_GURU
+}
+
+enum ServiceType {
+  SESSION_BASED
+  DELIVERABLE_BASED
+}
+
+enum DeliverableStatus {
+  AWAITING_DELIVERY
+  DELIVERED
+  REVISION_REQUESTED
+  COMPLETED
+  DISPUTED
 }
 
 enum OrderStatus {
@@ -50,6 +65,7 @@ enum SessionStatus {
 
 enum MutationType {
   CREDIT_FROM_SESSION
+  CREDIT_FROM_DELIVERABLE
   WITHDRAWAL
 }
 
@@ -83,16 +99,18 @@ model User {
   phone        String
   passwordHash String
   role         Role            @default(PARENT)
+  schoolName   String?
   isActive     Boolean         @default(true)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  tutorProfile    TutorProfile?
-  studentProfiles StudentProfile[]
-  cart            Cart?
-  orders          Order[]
-  sessionReports  SessionReport[] @relation("ReportedByUser")
-  resolvedReports SessionReport[] @relation("ResolvedByAdmin")
+  tutorProfile        TutorProfile?
+  studentProfiles     StudentProfile[]
+  cart                Cart?
+  orders              Order[]
+  sessionReports      SessionReport[]   @relation("ReportedByUser")
+  resolvedReports     SessionReport[]   @relation("ResolvedByAdmin")
+  uploadedAttachments OrderAttachment[] @relation("AttachmentUploader")
 
   @@map("users")
 }
@@ -159,6 +177,7 @@ model TutorService {
   categoryId            String
   category              Category     @relation(fields: [categoryId], references: [id])
   title                 String
+  serviceType           ServiceType  @default(SESSION_BASED)
   teachingMode          TeachingMode
   durationMinutes       Int
   sessionCount          Int          @default(1)
@@ -166,6 +185,9 @@ model TutorService {
   description           String
   syllabusHighlights    String[]     @default([])
   specialAccommodations String?
+  estimatedDays         Int?         // Turnaround time in days for deliverables (e.g. 3)
+  deliverableFormats    String[]     @default([]) // e.g. ["DOCX", "PDF", "XLSX", "ZIP"]
+  maxRevisions          Int          @default(2)
   isActive              Boolean      @default(true)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
@@ -203,59 +225,91 @@ model Cart {
 }
 
 model CartItem {
-  id              String         @id @default(uuid())
+  id              String          @id @default(uuid())
   cartId          String
-  cart            Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cart            Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   serviceId       String
-  service         TutorService   @relation(fields: [serviceId], references: [id])
-  studentId       String
-  student         StudentProfile @relation(fields: [studentId], references: [id])
-  selectedSlots   Json           // Array of { date: string, startTime: string, endTime: string }
+  service         TutorService    @relation(fields: [serviceId], references: [id])
+  studentId       String?
+  student         StudentProfile? @relation(fields: [studentId], references: [id])
+  selectedSlots   Json            // Array of { date: string, startTime: string, endTime: string }
   teachingAddress String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@map("cart_items")
 }
 
 model Order {
-  id            String      @id @default(uuid())
-  invoiceNumber String      @unique
-  parentId      String
-  parent        User        @relation(fields: [parentId], references: [id])
-  totalAmount   Float
-  status        OrderStatus @default(WAITING_PAYMENT)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                String             @id @default(uuid())
+  invoiceNumber     String             @unique
+  parentId          String
+  parent            User               @relation(fields: [parentId], references: [id])
+  totalAmount       Float
+  status            OrderStatus        @default(WAITING_PAYMENT)
+  serviceType       ServiceType        @default(SESSION_BASED)
+  deliverableStatus DeliverableStatus?
+  revisionCount     Int                @default(0)
+  maxRevisions      Int                @default(2)
+  revisionNotes     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   items                  OrderItem[]
+  attachments            OrderAttachment[]
+  walletMutations        WalletMutation[]
   platformRevenueLedgers PlatformRevenueLedger[]
 
   @@map("orders")
 }
 
 model OrderItem {
-  id                    String         @id @default(uuid())
+  id                    String             @id @default(uuid())
   orderId               String
-  order                 Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order                 Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   serviceId             String
-  service               TutorService   @relation(fields: [serviceId], references: [id])
+  service               TutorService       @relation(fields: [serviceId], references: [id])
   tutorId               String
-  tutor                 TutorProfile   @relation(fields: [tutorId], references: [id])
-  studentId             String
-  student               StudentProfile @relation(fields: [studentId], references: [id])
+  tutor                 TutorProfile       @relation(fields: [tutorId], references: [id])
+  studentId             String?
+  student               StudentProfile?    @relation(fields: [studentId], references: [id])
+  serviceType           ServiceType        @default(SESSION_BASED)
   priceSnapshot         Float
-  platformFeePercent    Decimal        @default(15.00) @db.Decimal(5, 2)
+  platformFeePercent    Decimal            @default(15.00) @db.Decimal(5, 2)
   totalSessions         Int
-  completedSessions     Int            @default(0)
+  completedSessions     Int                @default(0)
   selectedSlotsSnapshot Json
   teachingAddress       String?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  notes                 String?
+  deliverableStatus     DeliverableStatus?
+  revisionCount         Int                @default(0)
+  maxRevisions          Int                @default(2)
+  revisionNotes         String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   bookingSessions BookingSession[]
+  attachments     OrderAttachment[]
 
   @@map("order_items")
+}
+
+model OrderAttachment {
+  id           String     @id @default(uuid())
+  orderId      String
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId  String?
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String?
+  uploadedById String
+  uploadedBy   User       @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@map("order_attachments")
 }
 
 model BookingSession {
@@ -289,6 +343,8 @@ model WalletMutation {
   tutor       TutorProfile    @relation(fields: [tutorId], references: [id])
   sessionId   String?         @unique
   session     BookingSession? @relation(fields: [sessionId], references: [id])
+  orderId     String?
+  order       Order?          @relation(fields: [orderId], references: [id])
   type        MutationType
   grossAmount Float           @default(0)
   feeDeducted Float           @default(0)
@@ -300,16 +356,16 @@ model WalletMutation {
 }
 
 model PlatformRevenueLedger {
-  id          String         @id @default(uuid())
+  id          String          @id @default(uuid())
   orderId     String
-  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  sessionId   String         @unique
-  session     BookingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionId   String?         @unique
+  session     BookingSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   tutorId     String
-  tutor       TutorProfile   @relation(fields: [tutorId], references: [id])
+  tutor       TutorProfile    @relation(fields: [tutorId], references: [id])
   grossAmount Float
   platformFee Float
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime        @default(now())
 
   @@map("platform_revenue_ledgers")
 }

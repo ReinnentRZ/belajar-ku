@@ -66,9 +66,13 @@ export function buildApp(): FastifyInstance {
       'Accept',
       'Origin',
       'X-Requested-With',
+      'ngrok-skip-browser-warning',
+      'Ngrok-Skip-Browser-Warning',
       'x-forwarded-for',
       'x-forwarded-host',
       'x-forwarded-proto',
+      'Access-Control-Request-Headers',
+      'Access-Control-Request-Method',
     ],
   });
 

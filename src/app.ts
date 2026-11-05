@@ -10,6 +10,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { cartRoutes } from './modules/cart/cart.routes.js';
 import { ordersRoutes } from './modules/orders/orders.routes.js';
 import { reportsRoutes } from './modules/reports/reports.routes.js';
+import { reviewsRoutes } from './modules/reviews/reviews.routes.js';
 import { servicesRoutes } from './modules/services/services.routes.js';
 import { sessionsRoutes } from './modules/sessions/sessions.routes.js';
 import { usersRoutes } from './modules/users/users.routes.js';
@@ -20,6 +21,22 @@ export function buildApp(): FastifyInstance {
     logger: {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
     },
+  });
+
+  // Support empty JSON body gracefully (e.g. DELETE/GET/POST with empty body and Content-Type: application/json)
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = typeof body === 'string' ? body.trim() : '';
+    if (!text) {
+      done(null, {});
+      return;
+    }
+    try {
+      const json = JSON.parse(text);
+      done(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
   });
 
   // Security & Cross-Origin
@@ -87,6 +104,7 @@ export function buildApp(): FastifyInstance {
       apiV1.register(ordersRoutes);
       apiV1.register(sessionsRoutes);
       apiV1.register(reportsRoutes);
+      apiV1.register(reviewsRoutes);
       apiV1.register(adminRoutes);
     },
     { prefix: '/api/v1' }

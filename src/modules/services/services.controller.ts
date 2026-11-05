@@ -32,10 +32,10 @@ export class ServicesController {
     });
   }
 
-  // Tutor Service Handlers
+  // Tutor / Admin Service Handlers
   async createService(request: FastifyRequest, reply: FastifyReply) {
     const validatedData = createServiceSchema.parse(request.body);
-    const service = await servicesService.createService(request.user.id, validatedData);
+    const service = await servicesService.createService(request.user.id, request.user.role, validatedData);
 
     return reply.status(201).send({
       success: true,
@@ -75,12 +75,23 @@ export class ServicesController {
   async updateService(request: FastifyRequest, reply: FastifyReply) {
     const { id } = serviceIdParamSchema.parse(request.params);
     const validatedData = updateServiceSchema.parse(request.body);
-    const service = await servicesService.updateService(request.user.id, id, validatedData);
+    const service = await servicesService.updateService(request.user.id, request.user.role, id, validatedData);
 
     return reply.status(200).send({
       success: true,
       message: 'Service updated successfully',
       data: service,
+    });
+  }
+
+  async deleteService(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = serviceIdParamSchema.parse(request.params);
+    const result = await servicesService.deleteService(request.user.id, request.user.role, id);
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Layanan berhasil dihapus/dinonaktifkan',
+      data: result,
     });
   }
 

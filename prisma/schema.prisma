@@ -111,6 +111,7 @@ model User {
   sessionReports      SessionReport[]   @relation("ReportedByUser")
   resolvedReports     SessionReport[]   @relation("ResolvedByAdmin")
   uploadedAttachments OrderAttachment[] @relation("AttachmentUploader")
+  reviews             Review[]
 
   @@map("users")
 }
@@ -135,6 +136,7 @@ model TutorProfile {
   bookingSessions         BookingSession[]
   walletMutations         WalletMutation[]
   platformRevenueLedgers  PlatformRevenueLedger[]
+  reviews                 Review[]
 
   @@map("tutor_profiles")
 }
@@ -260,6 +262,7 @@ model Order {
   attachments            OrderAttachment[]
   walletMutations        WalletMutation[]
   platformRevenueLedgers PlatformRevenueLedger[]
+  reviews                Review[]
 
   @@map("orders")
 }
@@ -389,4 +392,20 @@ model SessionReport {
   updatedAt    DateTime       @updatedAt
 
   @@map("session_reports")
+}
+
+model Review {
+  id        String       @id @default(uuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tutorId   String
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  parentId  String
+  parent    User         @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  rating    Int          // 1 to 5
+  comment   String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("reviews")
 }

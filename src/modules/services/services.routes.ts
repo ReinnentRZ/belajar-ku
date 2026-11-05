@@ -19,12 +19,12 @@ export async function servicesRoutes(fastify: FastifyInstance) {
   // Tutor Services & Aliases
   fastify.post(
     '/services',
-    { preHandler: [authenticate, authorizeRoles('TUTOR')] },
+    { preHandler: [authenticate, authorizeRoles('TUTOR', 'ADMIN')] },
     servicesController.createService
   );
   fastify.post(
     '/tutor/services',
-    { preHandler: [authenticate, authorizeRoles('TUTOR')] },
+    { preHandler: [authenticate, authorizeRoles('TUTOR', 'ADMIN')] },
     servicesController.createService
   );
   fastify.get(
@@ -44,8 +44,13 @@ export async function servicesRoutes(fastify: FastifyInstance) {
   );
   fastify.put(
     '/services/:id',
-    { preHandler: [authenticate, authorizeRoles('TUTOR')] },
+    { preHandler: [authenticate, authorizeRoles('TUTOR', 'ADMIN')] },
     servicesController.updateService
+  );
+  fastify.delete(
+    '/services/:id',
+    { preHandler: [authenticate, authorizeRoles('TUTOR', 'ADMIN')] },
+    servicesController.deleteService
   );
 
   // Tutor Availability

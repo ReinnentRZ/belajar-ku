@@ -36,6 +36,12 @@ export class OrdersService {
     let hasDeliverables = false;
 
     for (const item of cart.items) {
+      if (!item.service.isActive) {
+        throw new BadRequestError(
+          `Layanan "${item.service.title}" saat ini sedang non-aktif atau tidak tersedia untuk dipesan.`
+        );
+      }
+
       if (item.service.serviceType === 'DELIVERABLE_BASED') {
         hasDeliverables = true;
         continue;

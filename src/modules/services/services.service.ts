@@ -36,13 +36,18 @@ export class ServicesService {
   }
 
   // Tutor Services
-  async createService(tutorUserId: string, input: CreateServiceInput) {
-    const tutorProfile = await prisma.tutorProfile.findUnique({
-      where: { userId: tutorUserId },
+  async createService(userId: string, role: string, input: CreateServiceInput) {
+    let tutorProfile = await prisma.tutorProfile.findUnique({
+      where: { userId },
     });
 
     if (!tutorProfile) {
-      throw new NotFoundError('Tutor profile not found for this user');
+      if (role === 'ADMIN') {
+        tutorProfile = await prisma.tutorProfile.findFirst();
+      }
+      if (!tutorProfile) {
+        throw new NotFoundError('Tutor profile not found for this user');
+      }
     }
 
     const category = await prisma.category.findUnique({
@@ -239,15 +244,7 @@ export class ServicesService {
     return service;
   }
 
-  async updateService(tutorUserId: string, serviceId: string, input: UpdateServiceInput) {
-    const tutorProfile = await prisma.tutorProfile.findUnique({
-      where: { userId: tutorUserId },
-    });
-
-    if (!tutorProfile) {
-      throw new NotFoundError('Tutor profile not found');
-    }
-
+  async updateService(userId: string, role: string, serviceId: string, input: UpdateServiceInput) {
     const service = await prisma.tutorService.findUnique({
       where: { id: serviceId },
     });
@@ -256,8 +253,14 @@ export class ServicesService {
       throw new NotFoundError('Service not found');
     }
 
-    if (service.tutorId !== tutorProfile.id) {
-      throw new ForbiddenError('You do not have permission to modify this service');
+    if (role !== 'ADMIN') {
+      const tutorProfile = await prisma.tutorProfile.findUnique({
+        where: { userId },
+      });
+
+      if (!tutorProfile || service.tutorId !== tutorProfile.id) {
+        throw new ForbiddenError('You do not have permission to modify this service');
+      }
     }
 
     return await prisma.tutorService.update({
@@ -281,6 +284,44 @@ export class ServicesService {
       include: {
         category: true,
       },
+    });
+  }
+
+  async deleteService(userId: string, role: string, serviceId: string) {
+    const service = await prisma.tutorService.findUnique({
+      where: { id: serviceId },
+      include: { orderItems: true, cartItems: true },
+    });
+
+    if (!service) {
+      throw new NotFoundError('Service not found');
+    }
+
+    if (role !== 'ADMIN') {
+      const tutorProfile = await prisma.tutorProfile.findUnique({
+        where: { userId },
+      });
+
+      if (!tutorProfile || service.tutorId !== tutorProfile.id) {
+        throw new ForbiddenError('You do not have permission to delete this service');
+      }
+    }
+
+    // If service has orderItems, soft delete by setting isActive: false
+    if (service.orderItems && service.orderItems.length > 0) {
+      return await prisma.tutorService.update({
+        where: { id: serviceId },
+        data: { isActive: false },
+      });
+    }
+
+    // Remove any cart items first to avoid foreign key violation
+    if (service.cartItems && service.cartItems.length > 0) {
+      await prisma.cartItem.deleteMany({ where: { serviceId } });
+    }
+
+    return await prisma.tutorService.delete({
+      where: { id: serviceId },
     });
   }
 

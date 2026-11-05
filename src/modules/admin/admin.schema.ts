@@ -25,11 +25,11 @@ export const reportFilterSchema = z.object({
     .optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
-});
+}).passthrough();
 
 export const verifyTutorSchema = z.object({
   isVerified: z.boolean().default(true),
-});
+}).passthrough();
 
 export const adminTransactionFilterSchema = z.object({
   status: z
@@ -41,7 +41,7 @@ export const adminTransactionFilterSchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-});
+}).passthrough();
 
 export const orderIdParamSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),

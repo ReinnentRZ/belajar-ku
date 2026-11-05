@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { loginSchema, registerSchema } from './auth.schema.js';
+import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from './auth.schema.js';
 import { authService } from './auth.service.js';
 
 export class AuthController {
@@ -40,6 +40,27 @@ export class AuthController {
     return reply.status(200).send({
       success: true,
       data: user,
+    });
+  }
+
+  async updateProfile(request: FastifyRequest, reply: FastifyReply) {
+    const validatedData = updateProfileSchema.parse(request.body);
+    const user = await authService.updateProfile(request.user.id, validatedData);
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Profil berhasil diperbarui',
+      data: user,
+    });
+  }
+
+  async changePassword(request: FastifyRequest, reply: FastifyReply) {
+    const validatedData = changePasswordSchema.parse(request.body);
+    const result = await authService.changePassword(request.user.id, validatedData);
+
+    return reply.status(200).send({
+      success: true,
+      message: result.message,
     });
   }
 }

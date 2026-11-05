@@ -13,7 +13,7 @@ export const sessionIdParamSchema = z.object({
 export const listSessionsQuerySchema = z.object({
   status: z.enum(['SCHEDULED', 'COMPLETED', 'RESCHEDULED', 'CANCELLED']).optional(),
   studentId: z.string().uuid().optional(),
-});
+}).passthrough();
 
 export type CompleteSessionInput = z.infer<typeof completeSessionSchema>;
 export type ListSessionsQueryInput = z.infer<typeof listSessionsQuerySchema>;

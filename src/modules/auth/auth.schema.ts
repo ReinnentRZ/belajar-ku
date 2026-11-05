@@ -60,5 +60,19 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Kata sandi wajib diisi'),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().trim().min(2, 'Nama minimal 2 karakter').optional(),
+  phone: z.string().trim().optional(),
+  phoneNumber: z.string().trim().optional(),
+  schoolName: z.string().trim().optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Kata sandi saat ini wajib diisi'),
+  newPassword: z.string().min(8, 'Kata sandi baru minimal 8 karakter'),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

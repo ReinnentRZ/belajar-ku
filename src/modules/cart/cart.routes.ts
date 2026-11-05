@@ -9,5 +9,6 @@ export async function cartRoutes(fastify: FastifyInstance) {
 
   fastify.post('/cart', cartController.addToCart);
   fastify.get('/cart', cartController.getCart);
+  fastify.put('/cart/:id', cartController.updateItem);
   fastify.delete('/cart/:id', cartController.removeItem);
 }

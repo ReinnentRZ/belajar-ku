@@ -15,6 +15,11 @@ export async function usersRoutes(fastify: FastifyInstance) {
     { preHandler: [authenticate, authorizeRoles('PARENT')] },
     usersController.getStudents
   );
+  fastify.get(
+    '/students/:id',
+    { preHandler: [authenticate, authorizeRoles('PARENT')] },
+    usersController.getStudentById
+  );
   fastify.put(
     '/students/:id',
     { preHandler: [authenticate, authorizeRoles('PARENT')] },

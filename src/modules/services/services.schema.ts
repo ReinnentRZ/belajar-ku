@@ -77,7 +77,7 @@ export const searchServicesQuerySchema = z.object({
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 10))
     .refine((val) => val > 0 && val <= 50, 'Limit must be between 1 and 50'),
-});
+}).passthrough();
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;

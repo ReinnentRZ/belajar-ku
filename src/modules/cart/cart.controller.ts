@@ -33,6 +33,18 @@ export class CartController {
       data: result,
     });
   }
+
+  async updateItem(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = cartItemIdParamSchema.parse(request.params);
+    const body = (request.body as any) || {};
+    const result = await cartService.updateCartItem(request.user.id, id, body);
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Item keranjang berhasil diperbarui',
+      data: result,
+    });
+  }
 }
 
 export const cartController = new CartController();

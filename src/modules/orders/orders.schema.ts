@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const checkoutSchema = z.object({
   paymentMethod: z.string().optional().default('MOCK_PAYMENT_GATEWAY'),
-});
+}).passthrough();
 
 export const mockPaymentWebhookSchema = z.object({
   invoiceNumber: z.string().min(1, 'invoiceNumber is required'),

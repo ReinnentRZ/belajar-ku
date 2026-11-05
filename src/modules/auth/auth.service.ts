@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import prisma from '../../config/database.js';
-import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../utils/errors.js';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../utils/errors.js';
 import { LoginInput, RegisterInput } from './auth.schema.js';
 
 export class AuthService {
@@ -103,6 +103,54 @@ export class AuthService {
     // Exclude passwordHash from output
     const { passwordHash: _pwd, ...sanitizedUser } = user;
     return sanitizedUser;
+  }
+
+  async updateProfile(userId: string, input: { name?: string; phone?: string; phoneNumber?: string; schoolName?: string }) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const phone = input.phone || input.phoneNumber;
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(input.name && { name: input.name }),
+        ...(phone && { phone }),
+        ...(input.schoolName !== undefined && { schoolName: input.schoolName }),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        schoolName: true,
+      },
+    });
+
+    return updated;
+  }
+
+  async changePassword(userId: string, input: { currentPassword: string; newPassword: string }) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const isValid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new BadRequestError('Kata sandi saat ini tidak cocok');
+    }
+
+    const newHash = await bcrypt.hash(input.newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+
+    return { success: true, message: 'Kata sandi berhasil diperbarui' };
   }
 }
 

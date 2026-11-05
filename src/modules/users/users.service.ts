@@ -1,5 +1,5 @@
 import prisma from '../../config/database.js';
-import { ForbiddenError, NotFoundError } from '../../utils/errors.js';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import { CreateStudentInput, UpdateStudentInput, UpdateTutorProfileInput } from './users.schema.js';
 
 export class UsersService {
@@ -20,6 +20,22 @@ export class UsersService {
       where: { parentId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getStudentById(parentId: string, studentId: string) {
+    const student = await prisma.studentProfile.findUnique({
+      where: { id: studentId },
+    });
+
+    if (!student) {
+      throw new NotFoundError('Student profile not found');
+    }
+
+    if (student.parentId !== parentId) {
+      throw new ForbiddenError('You do not have permission to view this student profile');
+    }
+
+    return student;
   }
 
   async updateStudentProfile(parentId: string, studentId: string, input: UpdateStudentInput) {
@@ -56,6 +72,18 @@ export class UsersService {
 
     if (student.parentId !== parentId) {
       throw new ForbiddenError('You do not have permission to delete this student profile');
+    }
+
+    // Check if student has active booking sessions or orders
+    const activeSession = await prisma.bookingSession.findFirst({
+      where: {
+        studentId,
+        status: { in: ['SCHEDULED', 'RESCHEDULED', 'DISPUTED'] },
+      },
+    });
+
+    if (activeSession) {
+      throw new BadRequestError('Tidak dapat menghapus profil anak yang memiliki sesi belajar aktif atau terjadwal.');
     }
 
     await prisma.studentProfile.delete({

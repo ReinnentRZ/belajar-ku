@@ -184,6 +184,30 @@ export class CartService {
 
     return { id: cartItemId };
   }
+
+  async updateCartItem(parentId: string, cartItemId: string, input: { notes?: string; teachingAddress?: string }) {
+    const cartItem = await prisma.cartItem.findUnique({
+      where: { id: cartItemId },
+      include: { cart: true },
+    });
+
+    if (!cartItem) {
+      throw new NotFoundError('Cart item not found');
+    }
+
+    if (cartItem.cart.parentId !== parentId) {
+      throw new ForbiddenError('You do not own this cart item');
+    }
+
+    return await prisma.cartItem.update({
+      where: { id: cartItemId },
+      data: {
+        ...(input.notes !== undefined && { notes: input.notes }),
+        ...(input.teachingAddress !== undefined && { teachingAddress: input.teachingAddress }),
+      },
+      include: { service: true, student: true },
+    });
+  }
 }
 
 export const cartService = new CartService();

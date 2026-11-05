@@ -86,12 +86,15 @@ export class AdminService {
 
     return {
       totalGmv,
+      grossRevenue: totalGmv,
       heldEscrow,
       platformRevenue,
       pendingReportsCount,
       unverifiedTutorsCount,
       totalOrdersCount,
+      totalOrders: totalOrdersCount,
       totalUsersCount,
+      totalUsers: totalUsersCount,
     };
   }
 

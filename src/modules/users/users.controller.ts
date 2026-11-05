@@ -31,6 +31,16 @@ export class UsersController {
     });
   }
 
+  async getStudentById(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = studentIdParamSchema.parse(request.params);
+    const student = await usersService.getStudentById(request.user.id, id);
+
+    return reply.status(200).send({
+      success: true,
+      data: student,
+    });
+  }
+
   async updateStudent(request: FastifyRequest, reply: FastifyReply) {
     const { id } = studentIdParamSchema.parse(request.params);
     const validatedData = updateStudentSchema.parse(request.body);

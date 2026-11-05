@@ -3,16 +3,20 @@ import axios, { AxiosError } from 'axios';
 /**
  * Isomorphic Base URL resolver:
  * - Browser / Client-side (`typeof window !== 'undefined'`):
- *   Uses an empty string '' so every API request hits the active domain (e.g. https://<tunnel>.trycloudflare.com)
- *   and gets reverse-proxied by Next.js to the backend without loopback failures on mobile/remote devices.
+ *   Uses NEXT_PUBLIC_API_URL (e.g. Ngrok tunnel or backend domain) so client-side
+ *   browser requests target the backend directly without 404 on Vercel deployment.
  * - Server-side / SSR (`typeof window === 'undefined'`):
- *   Uses INTERNAL_API_URL ('http://api:5000') or fallback to 'http://localhost:5000'.
+ *   Uses INTERNAL_API_URL ('http://api:5000'), NEXT_PUBLIC_API_URL, or fallback to 'http://localhost:5000'.
  */
 const getBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
-    return '';
+    return (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
   }
-  return process.env.INTERNAL_API_URL || 'http://localhost:5000';
+  const serverUrl =
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:5000';
+  return serverUrl.replace(/\/+$/, '');
 };
 
 export const api = axios.create({

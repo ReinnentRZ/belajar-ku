@@ -10,7 +10,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictError('User with this email already exists');
+      throw new ConflictError('Email ini sudah terdaftar. Silakan gunakan email lain atau langsung masuk.');
     }
 
     const saltRounds = 10;

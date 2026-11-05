@@ -2,11 +2,20 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../../config/database.js';
 import redis from '../../config/redis.js';
 import { SelectedSlot } from '../../types/index.js';
+import { isSlotMatchingAvailability } from '../../utils/date.js';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import { CheckoutInput, MockPaymentWebhookInput } from './orders.schema.js';
 
 export class OrdersService {
   async checkout(parentId: string, _input: CheckoutInput) {
+    const user = await prisma.user.findUnique({
+      where: { id: parentId },
+      select: { role: true },
+    });
+    if (user?.role === 'TUTOR' || user?.role === 'ADMIN') {
+      throw new ForbiddenError('Only PARENT or INSTITUTION accounts can checkout orders');
+    }
+
     const cart = await prisma.cart.findUnique({
       where: { parentId },
       include: {
@@ -33,7 +42,30 @@ export class OrdersService {
       }
 
       const slots = (item.selectedSlots as unknown as SelectedSlot[]) || [];
+
+      // Validate session slot dates match tutor's configured weekly availability
+      const tutorAvailabilities = await prisma.tutorAvailability.findMany({
+        where: {
+          tutorId: item.service.tutorId,
+          isActive: true,
+        },
+      });
+
       for (const slot of slots) {
+        if (tutorAvailabilities.length > 0) {
+          const match = tutorAvailabilities.some((avail) =>
+            isSlotMatchingAvailability(slot, avail)
+          );
+
+          if (!match) {
+            throw new BadRequestError(
+              `Jadwal sesi pada tanggal ${slot.date} tidak sesuai dengan hari mengajar guru.`,
+              undefined,
+              'INVALID_SCHEDULE_DATE'
+            );
+          }
+        }
+
         const slotDate = new Date(`${slot.date}T00:00:00.000Z`);
 
         // Check if already booked and scheduled in PostgreSQL
@@ -48,7 +80,9 @@ export class OrdersService {
 
         if (existingBooking) {
           throw new ConflictError(
-            `Jadwal guru sudah dipesan oleh pengguna lain: ${slot.date} ${slot.startTime}`
+            `Jadwal guru sudah dipesan oleh pengguna lain: ${slot.date} ${slot.startTime}`,
+            undefined,
+            'SLOT_LOCKED'
           );
         }
 
@@ -70,7 +104,9 @@ export class OrdersService {
         const result = await redis.set(lock.key, parentId, 'EX', 900, 'NX');
         if (!result) {
           throw new ConflictError(
-            `Jadwal guru sudah dipesan oleh pengguna lain: ${lock.date} ${lock.time}`
+            `Jadwal guru sudah dipesan oleh pengguna lain: ${lock.date} ${lock.time}`,
+            undefined,
+            'SLOT_LOCKED'
           );
         }
         acquiredLocks.push(lock.key);
@@ -239,6 +275,44 @@ export class OrdersService {
     }
 
     return result;
+  }
+
+  async simulatePayment(orderIdOrInvoice: string) {
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [{ id: orderIdOrInvoice }, { invoiceNumber: orderIdOrInvoice }],
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundError(`Order with ID/Invoice '${orderIdOrInvoice}' not found`);
+    }
+
+    if (order.status === 'PAID') {
+      const paidOrder = await prisma.order.findUnique({
+        where: { id: order.id },
+        include: {
+          items: {
+            include: {
+              service: true,
+              student: true,
+            },
+          },
+        },
+      });
+      return {
+        message: 'Order sudah berstatus LUNAS (PAID)',
+        order: paidOrder,
+      };
+    }
+
+    return await this.handlePaymentWebhook({
+      invoiceNumber: order.invoiceNumber,
+      paymentStatus: 'SETTLEMENT',
+    });
   }
 
   async getMyOrders(userId: string, role?: string) {

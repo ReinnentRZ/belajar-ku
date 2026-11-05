@@ -16,9 +16,14 @@ export async function servicesRoutes(fastify: FastifyInstance) {
     servicesController.createCategory
   );
 
-  // Tutor
+  // Tutor Services & Aliases
   fastify.post(
     '/services',
+    { preHandler: [authenticate, authorizeRoles('TUTOR')] },
+    servicesController.createService
+  );
+  fastify.post(
+    '/tutor/services',
     { preHandler: [authenticate, authorizeRoles('TUTOR')] },
     servicesController.createService
   );
@@ -26,6 +31,16 @@ export async function servicesRoutes(fastify: FastifyInstance) {
     '/services/mine',
     { preHandler: [authenticate, authorizeRoles('TUTOR')] },
     servicesController.getMyServices
+  );
+  fastify.get(
+    '/tutor/my-services',
+    { preHandler: [authenticate, authorizeRoles('TUTOR')] },
+    servicesController.getMyServices
+  );
+  fastify.get(
+    '/tutor/bookings',
+    { preHandler: [authenticate, authorizeRoles('TUTOR')] },
+    servicesController.getTutorBookings
   );
   fastify.put(
     '/services/:id',

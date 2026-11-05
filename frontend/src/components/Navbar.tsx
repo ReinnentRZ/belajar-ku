@@ -1,11 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
   Building2,
   Calendar,
   ChevronDown,
+  CreditCard,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -15,6 +16,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   User as UserIcon,
+  Users,
   Wallet,
   X,
 } from 'lucide-react';
@@ -28,6 +30,7 @@ export function Navbar() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -50,6 +53,16 @@ export function Navbar() {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
+  // Real-time cart synchronization on cart-updated event
+  useEffect(() => {
+    const handleCartUpdated = () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    };
+
+    window.addEventListener('cart-updated', handleCartUpdated);
+    return () => window.removeEventListener('cart-updated', handleCartUpdated);
+  }, [queryClient]);
+
   // Fetch cart count for PARENT and INSTITUTION
   const { data: cartData } = useQuery({
     queryKey: ['cart'],
@@ -58,6 +71,8 @@ export function Navbar() {
       return res.data?.data;
     },
     enabled: !!user && (user.role === 'PARENT' || user.role === 'INSTITUTION'),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const cartItemCount = cartData?.items?.length || 0;
@@ -94,7 +109,7 @@ export function Navbar() {
 
         {/* Center Navigation - Conditional RBAC Rendering */}
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 text-sm font-medium">
-          {/* 1. ADMIN Navigation: Only Beranda & Admin Portal */}
+          {/* 1. ADMIN Navigation: Only Beranda, Admin Portal & Kelola Pengguna */}
           {user?.role === 'ADMIN' ? (
             <>
               <Link
@@ -110,7 +125,7 @@ export function Navbar() {
               <Link
                 href="/admin/dashboard"
                 className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
-                  isActive('/admin/dashboard')
+                  pathname === '/admin/dashboard'
                     ? 'text-purple-700 bg-purple-50 shadow-sm border border-purple-200'
                     : 'text-purple-600 hover:text-purple-800 hover:bg-purple-50/60'
                 }`}
@@ -118,9 +133,67 @@ export function Navbar() {
                 <ShieldCheck className="w-4 h-4 text-purple-600" />
                 <span>Admin Portal</span>
               </Link>
+              <Link
+                href="/admin/users"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  pathname.startsWith('/admin/users')
+                    ? 'text-purple-700 bg-purple-50 shadow-sm border border-purple-200'
+                    : 'text-slate-600 hover:text-purple-800 hover:bg-purple-50/60'
+                }`}
+              >
+                <Users className="w-4 h-4 text-purple-600" />
+                <span>Kelola Pengguna</span>
+              </Link>
+              <Link
+                href="/admin/transactions"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  pathname.startsWith('/admin/transactions')
+                    ? 'text-purple-700 bg-purple-50 shadow-sm border border-purple-200'
+                    : 'text-slate-600 hover:text-purple-800 hover:bg-purple-50/60'
+                }`}
+              >
+                <CreditCard className="w-4 h-4 text-purple-600" />
+                <span>Riwayat Transaksi</span>
+              </Link>
             </>
-          ) : user ? (
-            /* 2. Logged-in PARENT, TUTOR, INSTITUTION Navigation */
+          ) : user?.role === 'INSTITUTION' ? (
+            /* 2. INSTITUTION Navigation: Strictly hide Les Privat, focus on Modules & School Dashboard */
+            <>
+              <Link
+                href="/"
+                className={`px-3.5 py-2 rounded-xl transition-colors ${
+                  isActive('/') && pathname === '/'
+                    ? 'text-indigo-700 bg-indigo-50 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                Beranda
+              </Link>
+              <Link
+                href="/institution/dashboard"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  isActive('/institution/dashboard')
+                    ? 'text-indigo-700 bg-indigo-50 shadow-sm border border-indigo-200'
+                    : 'text-slate-600 hover:text-indigo-700 hover:bg-indigo-50/60'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4 text-indigo-600" />
+                <span>Dashboard Sekolah</span>
+              </Link>
+              <Link
+                href="/modules"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  isActive('/modules')
+                    ? 'text-indigo-700 bg-indigo-50 shadow-sm border border-indigo-200'
+                    : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/60'
+                }`}
+              >
+                <Building2 className="w-4 h-4 text-indigo-600" />
+                <span>Katalog Modul & Dokumen</span>
+              </Link>
+            </>
+          ) : user?.role === 'PARENT' ? (
+            /* 3. PARENT Navigation: Strictly tutoring-only navigation, NEVER show modules */
             <>
               <Link
                 href="/"
@@ -141,11 +214,69 @@ export function Navbar() {
                 }`}
               >
                 <BookOpen className="w-4 h-4 text-brand-500" />
-                <span>Katalog Jasa</span>
+                <span>Les Privat</span>
+              </Link>
+            </>
+          ) : user?.role === 'TUTOR' ? (
+            /* 4. TUTOR Navigation: Strictly supply-side menus only, NO buyer catalogs */
+            <>
+              <Link
+                href="/"
+                className={`px-3.5 py-2 rounded-xl transition-colors ${
+                  isActive('/') && pathname === '/'
+                    ? 'text-blue-700 bg-blue-50 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                Beranda
+              </Link>
+              <Link
+                href="/tutor/dashboard"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  pathname === '/tutor/dashboard'
+                    ? 'text-blue-700 bg-blue-50 shadow-sm border border-blue-200'
+                    : 'text-slate-600 hover:text-blue-700 hover:bg-slate-50'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4 text-blue-600" />
+                <span>Dashboard Guru</span>
+              </Link>
+              <Link
+                href="/tutor/services"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  isActive('/tutor/services')
+                    ? 'text-blue-700 bg-blue-50 shadow-sm border border-blue-200'
+                    : 'text-slate-600 hover:text-blue-700 hover:bg-slate-50'
+                }`}
+              >
+                <BookOpen className="w-4 h-4 text-blue-600" />
+                <span>Kelola Layanan</span>
+              </Link>
+              <Link
+                href="/tutor/bookings"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  isActive('/tutor/bookings')
+                    ? 'text-blue-700 bg-blue-50 shadow-sm border border-blue-200'
+                    : 'text-slate-600 hover:text-blue-700 hover:bg-slate-50'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span>Pesanan & Jadwal</span>
+              </Link>
+              <Link
+                href="/tutor/profile"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 font-bold ${
+                  isActive('/tutor/profile')
+                    ? 'text-blue-700 bg-blue-50 shadow-sm border border-blue-200'
+                    : 'text-slate-600 hover:text-blue-700 hover:bg-slate-50'
+                }`}
+              >
+                <UserIcon className="w-4 h-4 text-blue-600" />
+                <span>Profil Mengajar</span>
               </Link>
             </>
           ) : (
-            /* 3. Public / Guest Navigation */
+            /* 5. Public / Guest Navigation: Shows BOTH Les Privat and Modul & Dokumen */
             <>
               <Link
                 href="/"
@@ -166,7 +297,18 @@ export function Navbar() {
                 }`}
               >
                 <BookOpen className="w-4 h-4 text-brand-500" />
-                <span>Katalog Jasa</span>
+                <span>Les Privat</span>
+              </Link>
+              <Link
+                href="/modules"
+                className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 ${
+                  isActive('/modules')
+                    ? 'text-indigo-700 bg-indigo-50 font-bold'
+                    : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
+                }`}
+              >
+                <FileText className="w-4 h-4 text-indigo-500" />
+                <span>Modul & Dokumen Sekolah</span>
               </Link>
               <Link
                 href="/#cara-kerja"
@@ -280,13 +422,29 @@ export function Navbar() {
                     {/* Role-Specific Menu Options */}
                     <div className="py-1">
                       {user.role === 'ADMIN' && (
-                        <Link
-                          href="/admin/dashboard"
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-purple-700 hover:bg-purple-50 transition-colors"
-                        >
-                          <ShieldCheck className="w-4 h-4 text-purple-600" />
-                          <span>Konsol Admin</span>
-                        </Link>
+                        <>
+                          <Link
+                            href="/admin/dashboard"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+                          >
+                            <ShieldCheck className="w-4 h-4 text-purple-600" />
+                            <span>Konsol Admin</span>
+                          </Link>
+                          <Link
+                            href="/admin/users"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+                          >
+                            <Users className="w-4 h-4 text-purple-600" />
+                            <span>Direktori Pengguna</span>
+                          </Link>
+                          <Link
+                            href="/admin/transactions"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+                          >
+                            <CreditCard className="w-4 h-4 text-purple-600" />
+                            <span>Riwayat Transaksi & Escrow</span>
+                          </Link>
+                        </>
                       )}
 
                       {user.role === 'PARENT' && (
@@ -325,18 +483,32 @@ export function Navbar() {
                       {user.role === 'INSTITUTION' && (
                         <>
                           <Link
-                            href="/parent/dashboard"
+                            href="/institution/dashboard"
                             className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
                           >
                             <Building2 className="w-4 h-4 text-indigo-600" />
                             <span>Dashboard Sekolah</span>
                           </Link>
                           <Link
-                            href="/parent/dashboard"
+                            href="/modules"
                             className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
                           >
                             <FileText className="w-4 h-4 text-indigo-600" />
-                            <span>Pesanan Dokumen & LPJ</span>
+                            <span>Katalog Modul & Dokumen</span>
+                          </Link>
+                          <Link
+                            href="/cart"
+                            className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <ShoppingCart className="w-4 h-4 text-brand-600" />
+                              <span>Keranjang Pesanan</span>
+                            </div>
+                            {cartItemCount > 0 && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-brand-600 text-white">
+                                {cartItemCount}
+                              </span>
+                            )}
                           </Link>
                         </>
                       )}
@@ -351,11 +523,32 @@ export function Navbar() {
                             <span>Dashboard Guru</span>
                           </Link>
                           <Link
-                            href="/tutor/dashboard"
+                            href="/tutor/services"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                          >
+                            <BookOpen className="w-4 h-4 text-blue-600" />
+                            <span>Kelola Layanan</span>
+                          </Link>
+                          <Link
+                            href="/tutor/bookings"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                          >
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                            <span>Pesanan & Jadwal Masuk</span>
+                          </Link>
+                          <Link
+                            href="/tutor/wallet"
                             className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
                           >
                             <Wallet className="w-4 h-4 text-blue-600" />
-                            <span>Jadwal & Dompet</span>
+                            <span>Dompet & Penghasilan</span>
+                          </Link>
+                          <Link
+                            href="/tutor/profile"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                          >
+                            <UserIcon className="w-4 h-4 text-blue-600" />
+                            <span>Profil Mengajar</span>
                           </Link>
                         </>
                       )}
@@ -425,8 +618,59 @@ export function Navbar() {
                   <ShieldCheck className="w-4 h-4 text-purple-600" />
                   <span>Admin Portal</span>
                 </Link>
+                <Link
+                  href="/admin/users"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Users className="w-4 h-4 text-purple-600" />
+                  <span>Direktori Pengguna</span>
+                </Link>
+                <Link
+                  href="/admin/transactions"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <CreditCard className="w-4 h-4 text-purple-600" />
+                  <span>Riwayat Transaksi & Escrow</span>
+                </Link>
               </>
-            ) : user ? (
+            ) : user?.role === 'INSTITUTION' ? (
+              <>
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Beranda
+                </Link>
+                <Link
+                  href="/institution/dashboard"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-indigo-700 bg-indigo-50"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-indigo-600" />
+                  <span>Dashboard Sekolah</span>
+                </Link>
+                <Link
+                  href="/modules"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  <span>Katalog Modul & Dokumen</span>
+                </Link>
+                <Link
+                  href="/cart"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-brand-600" />
+                    <span>Keranjang Pesanan</span>
+                  </div>
+                  {cartItemCount > 0 && (
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-brand-600 text-white">
+                      {cartItemCount}
+                    </span>
+                  )}
+                </Link>
+              </>
+            ) : user?.role === 'PARENT' ? (
               <>
                 <Link
                   href="/"
@@ -439,7 +683,65 @@ export function Navbar() {
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <BookOpen className="w-4 h-4 text-brand-600" />
-                  <span>Katalog Jasa</span>
+                  <span>Les Privat</span>
+                </Link>
+                <Link
+                  href="/cart"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-brand-600" />
+                    <span>Keranjang Pesanan</span>
+                  </div>
+                  {cartItemCount > 0 && (
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-brand-600 text-white">
+                      {cartItemCount}
+                    </span>
+                  )}
+                </Link>
+              </>
+            ) : user?.role === 'TUTOR' ? (
+              <>
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Beranda
+                </Link>
+                <Link
+                  href="/tutor/dashboard"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-blue-700 bg-blue-50"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-blue-600" />
+                  <span>Dashboard Guru</span>
+                </Link>
+                <Link
+                  href="/tutor/services"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <span>Layanan Saya</span>
+                </Link>
+                <Link
+                  href="/tutor/bookings"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span>Pesanan & Jadwal Masuk</span>
+                </Link>
+                <Link
+                  href="/tutor/wallet"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Wallet className="w-4 h-4 text-blue-600" />
+                  <span>Dompet & Penghasilan</span>
+                </Link>
+                <Link
+                  href="/tutor/profile"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <UserIcon className="w-4 h-4 text-blue-600" />
+                  <span>Profil Mengajar</span>
                 </Link>
               </>
             ) : (
@@ -455,7 +757,14 @@ export function Navbar() {
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <BookOpen className="w-4 h-4 text-brand-600" />
-                  <span>Katalog Jasa</span>
+                  <span>Les Privat</span>
+                </Link>
+                <Link
+                  href="/modules"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <span>Modul & Dokumen Sekolah</span>
                 </Link>
                 <Link
                   href="/#cara-kerja"
@@ -485,7 +794,7 @@ export function Navbar() {
               )}
               {user.role === 'INSTITUTION' && (
                 <Link
-                  href="/parent/dashboard"
+                  href="/institution/dashboard"
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-indigo-700 bg-indigo-50"
                 >
                   <Building2 className="w-4 h-4" />
@@ -493,13 +802,43 @@ export function Navbar() {
                 </Link>
               )}
               {user.role === 'TUTOR' && (
-                <Link
-                  href="/tutor/dashboard"
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span>Dashboard Guru</span>
-                </Link>
+                <>
+                  <Link
+                    href="/tutor/dashboard"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span>Dashboard Guru</span>
+                  </Link>
+                  <Link
+                    href="/tutor/bookings"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span>Pesanan & Sesi Belajar</span>
+                  </Link>
+                  <Link
+                    href="/tutor/services"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <BookOpen className="w-4 h-4 text-blue-600" />
+                    <span>Layanan Saya</span>
+                  </Link>
+                  <Link
+                    href="/tutor/wallet"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Wallet className="w-4 h-4 text-blue-600" />
+                    <span>Dompet & Penghasilan</span>
+                  </Link>
+                  <Link
+                    href="/tutor/profile"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <UserIcon className="w-4 h-4 text-blue-600" />
+                    <span>Profil Mengajar</span>
+                  </Link>
+                </>
               )}
               <button
                 type="button"

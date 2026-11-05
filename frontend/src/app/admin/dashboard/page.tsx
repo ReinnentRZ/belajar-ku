@@ -10,6 +10,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  CreditCard,
   DollarSign,
   ExternalLink,
   Eye,
@@ -254,7 +255,21 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/transactions"
+            className="px-4 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:scale-[1.02]"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>Ledger & Riwayat Transaksi</span>
+          </Link>
+          <Link
+            href="/admin/users"
+            className="px-4 py-2.5 rounded-xl bg-purple-700/60 hover:bg-purple-700 text-white text-xs font-bold border border-purple-500/40 transition-all flex items-center gap-2"
+          >
+            <Users className="w-4 h-4" />
+            <span>Direktori Pengguna</span>
+          </Link>
           <button
             onClick={() => {
               refetchStats();
@@ -263,7 +278,7 @@ export default function AdminDashboardPage() {
             className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" />
-            Segarkan Data
+            <span>Segarkan</span>
           </button>
         </div>
       </div>
@@ -372,6 +387,14 @@ export default function AdminDashboardPage() {
             </span>
           )}
         </button>
+
+        <Link
+          href="/admin/users"
+          className="ml-auto py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Kelola Pengguna</span>
+        </Link>
       </div>
 
       {/* Tab 1: Unverified Tutors */}

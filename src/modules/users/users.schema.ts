@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { sanitizeText } from '../../utils/sanitize.js';
 
 export const createStudentSchema = z.object({
-  studentName: z.string().min(2, 'Student name must be at least 2 characters'),
+  studentName: z.string().trim().min(2, 'Student name must be at least 2 characters').transform(sanitizeText),
   gradeLevel: z.enum(['PAUD', 'TK', 'SD', 'SMP'], {
     errorMap: () => ({ message: "Grade level must be 'PAUD', 'TK', 'SD', or 'SMP'" }),
   }),
-  learningNotes: z.string().optional(),
+  learningNotes: z.string().optional().transform((v) => (v ? sanitizeText(v) : v)),
 });
 
 export const updateStudentSchema = createStudentSchema.partial();
@@ -15,11 +16,11 @@ export const studentIdParamSchema = z.object({
 });
 
 export const updateTutorProfileSchema = z.object({
-  bio: z.string().min(10, 'Bio must be at least 10 characters'),
-  education: z.string().min(2, 'Education details must be provided'),
-  address: z.string().min(5, 'Address must be at least 5 characters'),
-  teachingCredentials: z.string().optional(),
-  specialAccommodations: z.string().optional(),
+  bio: z.string().min(10, 'Bio must be at least 10 characters').transform(sanitizeText),
+  education: z.string().min(2, 'Education details must be provided').transform(sanitizeText),
+  address: z.string().min(5, 'Address must be at least 5 characters').transform(sanitizeText),
+  teachingCredentials: z.string().optional().transform((v) => (v ? sanitizeText(v) : v)),
+  specialAccommodations: z.string().optional().transform((v) => (v ? sanitizeText(v) : v)),
 });
 
 export const verifyTutorParamSchema = z.object({

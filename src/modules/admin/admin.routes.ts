@@ -33,4 +33,36 @@ export async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [authenticate, authorizeRoles('ADMIN')] },
     adminController.verifyTutor
   );
+
+  // Users Directory & Member Visibility
+  fastify.get(
+    '/admin/users',
+    { preHandler: [authenticate, authorizeRoles('ADMIN')] },
+    adminController.getUsers
+  );
+
+  fastify.patch(
+    '/admin/users/:id/toggle-status',
+    { preHandler: [authenticate, authorizeRoles('ADMIN')] },
+    adminController.toggleUserStatus
+  );
+
+  // Financial Systems & Escrow Transactions Ledger
+  fastify.get(
+    '/admin/transactions',
+    { preHandler: [authenticate, authorizeRoles('ADMIN')] },
+    adminController.getTransactions
+  );
+
+  fastify.get(
+    '/admin/transactions/:orderId',
+    { preHandler: [authenticate, authorizeRoles('ADMIN')] },
+    adminController.getTransactionDetail
+  );
+
+  fastify.post(
+    '/admin/transactions/:orderId/confirm-payment',
+    { preHandler: [authenticate, authorizeRoles('ADMIN')] },
+    adminController.confirmPaymentManual
+  );
 }

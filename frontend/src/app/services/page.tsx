@@ -3,27 +3,43 @@
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Building2, Calendar, Clock, FileText, Filter, GraduationCap, Heart, MapPin, RefreshCw, Search, ShieldCheck, Sparkles, User, Video } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import React, { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import { formatRupiah } from '../../lib/utils';
 
 function ServicesCatalogContent() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const isParent = user?.role === 'PARENT';
+
+  // Route Guard: Silently redirect INSTITUTION accounts to B2B modules catalog
+  useEffect(() => {
+    if (user?.role === 'INSTITUTION') {
+      router.replace('/modules');
+    }
+  }, [user, router]);
+
   const searchParams = useSearchParams();
   const initialType = searchParams.get('type') || '';
   const initialGrade = searchParams.get('gradeLevel') || '';
   const initialCategoryGroup = searchParams.get('categoryGroup') || '';
 
   const [portalType, setPortalType] = useState<'all' | 'student' | 'teacher'>(
-    initialType === 'teacher' ? 'teacher' : initialType === 'student' ? 'student' : 'all'
+    isParent ? 'student' : initialType === 'teacher' ? 'teacher' : initialType === 'student' ? 'student' : 'all'
   );
   const [selectedGrade, setSelectedGrade] = useState(initialGrade);
-  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(initialCategoryGroup);
+  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(
+    isParent && initialCategoryGroup === 'ADMINISTRASI_GURU' ? '' : initialCategoryGroup
+  );
   const [selectedMode, setSelectedMode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const activePortalType = isParent ? 'student' : portalType;
+
   // Fetch Categories
-  const { data: categories = [] } = useQuery({
+  const { data: rawCategories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
       const res = await api.get('/api/v1/categories');
@@ -31,14 +47,25 @@ function ServicesCatalogContent() {
     },
   });
 
+  const categories = isParent
+    ? rawCategories.filter((c: any) => c.categoryGroup !== 'ADMINISTRASI_GURU')
+    : rawCategories;
+
   // Fetch Services
   const { data: servicesData, isLoading } = useQuery({
-    queryKey: ['services', portalType, selectedGrade, selectedCategoryGroup, selectedMode, searchQuery],
+    queryKey: ['services', activePortalType, selectedGrade, selectedCategoryGroup, selectedMode, searchQuery, isParent],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (portalType !== 'all') params.append('type', portalType);
+      if (isParent) {
+        params.append('serviceType', 'SESSION_BASED');
+        params.append('type', 'student');
+      } else {
+        if (activePortalType !== 'all') params.append('type', activePortalType);
+      }
       if (selectedGrade) params.append('gradeLevel', selectedGrade);
-      if (selectedCategoryGroup) params.append('categoryGroup', selectedCategoryGroup);
+      if (selectedCategoryGroup && (!isParent || selectedCategoryGroup !== 'ADMINISTRASI_GURU')) {
+        params.append('categoryGroup', selectedCategoryGroup);
+      }
       if (selectedMode) params.append('teachingMode', selectedMode);
       if (searchQuery) params.append('search', searchQuery);
 
@@ -47,62 +74,81 @@ function ServicesCatalogContent() {
     },
   });
 
-  const services = servicesData?.items || [];
+  const rawServices = servicesData?.items || [];
+  const services = isParent
+    ? rawServices.filter(
+        (s: any) =>
+          s.serviceType === 'SESSION_BASED' &&
+          s.category?.categoryGroup !== 'ADMINISTRASI_GURU'
+      )
+    : rawServices;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
-      {/* Portal Switcher Tabs */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-100 p-1.5 rounded-2xl">
-        <div className="grid grid-cols-3 w-full sm:w-auto gap-1">
-          <button
-            onClick={() => setPortalType('all')}
-            className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-              portalType === 'all'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🌟 Semua Layanan
-          </button>
-          <button
-            onClick={() => setPortalType('student')}
-            className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
-              portalType === 'student'
-                ? 'bg-white text-emerald-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Les Privat Siswa (Sesi)</span>
-          </button>
-          <button
-            onClick={() => setPortalType('teacher')}
-            className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
-              portalType === 'teacher'
-                ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Layanan Dokumen & Modul Guru</span>
-          </button>
-        </div>
+      {/* Portal Switcher Tabs - Strictly Hidden for PARENT */}
+      {!isParent ? (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-100 p-1.5 rounded-2xl">
+          <div className="grid grid-cols-3 w-full sm:w-auto gap-1">
+            <button
+              onClick={() => setPortalType('all')}
+              className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                activePortalType === 'all'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              🌟 Semua Layanan
+            </button>
+            <button
+              onClick={() => setPortalType('student')}
+              className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+                activePortalType === 'student'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Les Privat Siswa (Sesi)</span>
+            </button>
+            <button
+              onClick={() => setPortalType('teacher')}
+              className={`py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+                activePortalType === 'teacher'
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Layanan Dokumen & Modul Guru</span>
+            </button>
+          </div>
 
-        <div className="text-xs text-slate-500 font-medium px-3 hidden sm:block">
-          {portalType === 'teacher'
-            ? 'Menampilkan modul ajar Kurikulum Merdeka & LPJ Dana BOS'
-            : portalType === 'student'
-            ? 'Menampilkan les privat tatap muka & online siswa'
-            : 'Menampilkan seluruh katalog les privat siswa & dokumen administrasi guru'}
+          <div className="text-xs text-slate-500 font-medium px-3 hidden sm:block">
+            {activePortalType === 'teacher'
+              ? 'Menampilkan modul ajar Kurikulum Merdeka & LPJ Dana BOS'
+              : activePortalType === 'student'
+              ? 'Menampilkan les privat tatap muka & online siswa'
+              : 'Menampilkan seluruh katalog les privat siswa & dokumen administrasi guru'}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-2xl flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+            <BookOpen className="w-4 h-4 text-emerald-600" />
+            <span>Katalog Resmi Les Privat Siswa & Guru Berpengalaman</span>
+          </div>
+          <span className="text-[11px] text-emerald-600 font-semibold hidden sm:inline">
+            Pendamping Belajar Terpercaya
+          </span>
+        </div>
+      )}
 
       {/* Header Banner */}
       <div
         className={`rounded-3xl p-6 sm:p-10 text-white shadow-lg transition-colors ${
-          portalType === 'teacher'
+          activePortalType === 'teacher'
             ? 'bg-gradient-to-r from-indigo-800 via-indigo-700 to-purple-700'
-            : portalType === 'student'
+            : activePortalType === 'student'
             ? 'bg-gradient-to-r from-emerald-800 via-emerald-600 to-teal-600'
             : 'bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600'
         }`}
@@ -111,24 +157,24 @@ function ServicesCatalogContent() {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5" />
             <span>
-              {portalType === 'teacher'
+              {activePortalType === 'teacher'
                 ? 'Pojok Administrasi Guru & Sekolah'
-                : portalType === 'student'
+                : activePortalType === 'student'
                 ? 'Katalog Les Privat Murid'
                 : 'Katalog Belajar-Ku Terpadu'}
             </span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
-            {portalType === 'teacher'
+            {activePortalType === 'teacher'
               ? 'Solusi Dokumen Kurikulum & LPJ Sekolah'
-              : portalType === 'student'
+              : activePortalType === 'student'
               ? 'Pilihan Guru Les Privat Terbaik'
               : 'Pilihan Guru Les & Layanan Administrasi'}
           </h1>
           <p className="text-white/90 text-sm sm:text-base leading-relaxed">
-            {portalType === 'teacher'
+            {activePortalType === 'teacher'
               ? 'Layanan penyusunan Modul Ajar Kurikulum Merdeka, CP, ATP, LKPD, serta asistensi LPJ BOS siap audit oleh konsultan berpengalaman.'
-              : portalType === 'student'
+              : activePortalType === 'student'
               ? 'Spesialisasi bimbingan Calistung PAUD, pelajaran SD & SMP, Literasi Al-Qur\'an (BTQ/Tajwid), serta Kelas Khusus Difabel (ABK).'
               : 'Temukan guru les privat tatap muka/online maupun konsultan penyusun perangkat kurikulum dan administrasi sekolah Anda.'}
           </p>
@@ -186,7 +232,7 @@ function ServicesCatalogContent() {
             { id: 'TAJWID', label: '✨ Tajwid & Makhraj' },
             { id: 'MUROJAAH', label: "🕌 Muroja'ah & Tahfidz" },
             { id: 'DIFABEL', label: '🤝 Inklusif / Difabel (ABK)' },
-            { id: 'ADMINISTRASI_GURU', label: '📑 Administrasi Guru / LPJ' },
+            ...(!isParent ? [{ id: 'ADMINISTRASI_GURU', label: '📑 Administrasi Guru / LPJ' }] : []),
           ].map((cat) => (
             <button
               key={cat.id}

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { BadRequestError } from '../../utils/errors.js';
+import { BadRequestError, ForbiddenError } from '../../utils/errors.js';
 import {
   checkoutSchema,
   deliverableFileParamSchema,
@@ -17,6 +17,12 @@ const MAX_FILE_SIZE = 52428800; // 50MB in bytes
 
 export class OrdersController {
   async checkout(request: FastifyRequest, reply: FastifyReply) {
+    if (request.user.role === 'TUTOR' || request.user.role === 'ADMIN') {
+      throw new ForbiddenError(
+        'Akun Guru atau Admin tidak dapat melakukan pemesanan (checkout). Mode pemesanan hanya untuk Orang Tua atau Institusi.'
+      );
+    }
+
     const validatedData = checkoutSchema.parse(request.body || {});
     const order = await ordersService.checkout(request.user.id, validatedData);
 
@@ -34,6 +40,17 @@ export class OrdersController {
     return reply.status(200).send({
       success: true,
       message: 'Payment webhook processed successfully',
+      data: result,
+    });
+  }
+
+  async simulatePayment(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = orderIdParamSchema.parse(request.params);
+    const result = await ordersService.simulatePayment(id);
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Simulasi pembayaran berhasil! Order dinyatakan LUNAS dan sesi telah dijadwalkan.',
       data: result,
     });
   }

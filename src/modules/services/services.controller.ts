@@ -53,6 +53,15 @@ export class ServicesController {
     });
   }
 
+  async getTutorBookings(request: FastifyRequest, reply: FastifyReply) {
+    const bookings = await servicesService.getTutorBookings(request.user.id);
+
+    return reply.status(200).send({
+      success: true,
+      data: bookings,
+    });
+  }
+
   async getServiceById(request: FastifyRequest, reply: FastifyReply) {
     const { id } = serviceIdParamSchema.parse(request.params);
     const service = await servicesService.getServiceById(id);
@@ -110,6 +119,28 @@ export class ServicesController {
   // Catalog Search
   async searchServices(request: FastifyRequest, reply: FastifyReply) {
     const query = searchServicesQuerySchema.parse(request.query);
+
+    if (query.type === 'SESSION_BASED' || query.type === 'DELIVERABLE_BASED') {
+      if (!query.serviceType) {
+        query.serviceType = query.type;
+      }
+      query.type = undefined;
+    }
+
+    // If caller has an auth token and is PARENT, strictly enforce SESSION_BASED tutoring
+    try {
+      if (request.headers.authorization) {
+        await request.jwtVerify();
+      }
+    } catch {
+      // Ignore token verification errors for public catalog search
+    }
+
+    if ((request.user as any)?.role === 'PARENT') {
+      query.serviceType = 'SESSION_BASED';
+      query.type = 'student';
+    }
+
     const result = await servicesService.searchServices(query);
 
     return reply.status(200).send({

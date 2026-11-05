@@ -31,6 +31,24 @@ export const verifyTutorSchema = z.object({
   isVerified: z.boolean().default(true),
 });
 
+export const adminTransactionFilterSchema = z.object({
+  status: z
+    .enum(['ALL', 'WAITING_PAYMENT', 'PAID', 'COMPLETED', 'CANCELLED', 'DISPUTED'])
+    .default('ALL'),
+  serviceType: z
+    .enum(['ALL', 'SESSION_BASED', 'DELIVERABLE_BASED'])
+    .default('ALL'),
+  search: z.string().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const orderIdParamSchema = z.object({
+  orderId: z.string().uuid('Order ID must be a valid UUID'),
+});
+
 export type ResolveReportInput = z.infer<typeof resolveReportSchema>;
 export type ReportFilterQuery = z.infer<typeof reportFilterSchema>;
 export type VerifyTutorInput = z.infer<typeof verifyTutorSchema>;
+export type AdminTransactionFilterQuery = z.infer<typeof adminTransactionFilterSchema>;
+export type OrderIdParam = z.infer<typeof orderIdParamSchema>;

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, FileText, Image as ImageIcon, Send, ShieldAlert, X } from 'lucide-react';
 import React, { useState } from 'react';
-import api from '../lib/api';
+import api, { getApiErrorMessage } from '../lib/api';
 
 interface ReportSessionModalProps {
   isOpen: boolean;
@@ -49,10 +49,9 @@ export function ReportSessionModal({
       setErrorMessage('');
       if (onSuccess) onSuccess();
     },
-    onError: (err: any) => {
-      setErrorMessage(
-        err.response?.data?.message || 'Gagal mengirimkan laporan sengketa. Silakan coba lagi.'
-      );
+    onError: (err: unknown) => {
+      const parsed = getApiErrorMessage(err);
+      setErrorMessage(parsed.fieldErrors.description || parsed.message);
     },
   });
 
@@ -128,9 +127,16 @@ export function ReportSessionModal({
               required
               rows={3}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (errorMessage) setErrorMessage('');
+              }}
               placeholder="Jelaskan secara detail apa yang terjadi pada waktu sesi..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-colors ${
+                errorMessage
+                  ? 'border-rose-400 ring-2 ring-rose-500/10 focus:border-rose-500'
+                  : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500/20'
+              }`}
             />
           </div>
 

@@ -3,13 +3,28 @@
 import { ArrowRight, Building2, GraduationCap, Lock, Mail, Phone, User, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../lib/api';
+import api, { getApiErrorMessage } from '../../lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { user, token, isLoading: isAuthLoading, login } = useAuth();
+
+  // Auth Guard: If already authenticated, redirect immediately based on role
+  useEffect(() => {
+    if (!isAuthLoading && user && token) {
+      if (user.role === 'ADMIN') {
+        router.replace('/admin/dashboard');
+      } else if (user.role === 'TUTOR') {
+        router.replace('/tutor/dashboard');
+      } else if (user.role === 'INSTITUTION') {
+        router.replace('/institution/dashboard');
+      } else {
+        router.replace('/parent/dashboard');
+      }
+    }
+  }, [user, token, isAuthLoading, router]);
 
   const [role, setRole] = useState<'PARENT' | 'TUTOR' | 'INSTITUTION'>('PARENT');
   const [name, setName] = useState('');
@@ -18,46 +33,50 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [schoolName, setSchoolName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setFieldErrors({});
     setIsSubmitting(true);
 
     try {
       // 1. Register user
       await api.post('/api/v1/auth/register', {
-        name,
-        email,
-        phone,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
         password,
         role,
-        ...(role === 'INSTITUTION' ? { schoolName } : {}),
+        ...(role === 'INSTITUTION' ? { schoolName: schoolName.trim() } : {}),
       });
 
-      // 2. Automatically log in
+      // 2. Automatically log in upon successful registration
       const loginRes = await api.post('/api/v1/auth/login', {
-        email,
+        email: email.trim(),
         password,
       });
 
       if (loginRes.data?.success && loginRes.data?.data) {
-        const { token, user } = loginRes.data.data;
-        login(token, user);
+        const { token: receivedToken, user: loggedUser } = loginRes.data.data;
+        login(receivedToken, loggedUser);
 
-        if (user.role === 'TUTOR') {
+        if (loggedUser.role === 'ADMIN') {
+          router.push('/admin/dashboard');
+        } else if (loggedUser.role === 'TUTOR') {
           router.push('/tutor/dashboard');
+        } else if (loggedUser.role === 'INSTITUTION') {
+          router.push('/institution/dashboard');
         } else {
           router.push('/parent/dashboard');
         }
       }
-    } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        err.response?.data?.errors?.[0]?.message ||
-        'Pendaftaran gagal. Periksa kembali kelengkapan data.';
-      setErrorMsg(message);
+    } catch (err: unknown) {
+      const parsed = getApiErrorMessage(err);
+      setFieldErrors(parsed.fieldErrors);
+      setErrorMsg(parsed.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -77,7 +96,7 @@ export default function RegisterPage() {
         </div>
 
         {errorMsg && (
-          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium">
             {errorMsg}
           </div>
         )}
@@ -86,7 +105,10 @@ export default function RegisterPage() {
         <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-2xl">
           <button
             type="button"
-            onClick={() => setRole('PARENT')}
+            onClick={() => {
+              setRole('PARENT');
+              setFieldErrors({});
+            }}
             className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 transition-all ${
               role === 'PARENT'
                 ? 'bg-white text-emerald-700 shadow-sm'
@@ -98,7 +120,10 @@ export default function RegisterPage() {
           </button>
           <button
             type="button"
-            onClick={() => setRole('TUTOR')}
+            onClick={() => {
+              setRole('TUTOR');
+              setFieldErrors({});
+            }}
             className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 transition-all ${
               role === 'TUTOR'
                 ? 'bg-white text-brand-700 shadow-sm'
@@ -110,7 +135,10 @@ export default function RegisterPage() {
           </button>
           <button
             type="button"
-            onClick={() => setRole('INSTITUTION')}
+            onClick={() => {
+              setRole('INSTITUTION');
+              setFieldErrors({});
+            }}
             className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 transition-all ${
               role === 'INSTITUTION'
                 ? 'bg-white text-indigo-700 shadow-sm'
@@ -133,7 +161,10 @@ export default function RegisterPage() {
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }));
+                }}
                 placeholder={
                   role === 'PARENT'
                     ? 'Bunda / Ayah ...'
@@ -141,9 +172,16 @@ export default function RegisterPage() {
                     ? 'Kak / Bu / Pak ...'
                     : 'Bpk. / Ibu Kepala Sekolah / Guru'
                 }
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm transition-colors"
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                  fieldErrors.name
+                    ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                }`}
               />
             </div>
+            {fieldErrors.name && (
+              <p className="text-xs text-rose-600 font-medium mt-1">{fieldErrors.name}</p>
+            )}
           </div>
 
           {role === 'INSTITUTION' && (
@@ -157,11 +195,22 @@ export default function RegisterPage() {
                   type="text"
                   required
                   value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
+                  onChange={(e) => {
+                    setSchoolName(e.target.value);
+                    if (fieldErrors.schoolName)
+                      setFieldErrors((prev) => ({ ...prev, schoolName: '' }));
+                  }}
                   placeholder="Contoh: SD Negeri 01 Pagi Menteng"
-                  className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition-colors"
+                  className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                    fieldErrors.schoolName
+                      ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                      : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  }`}
                 />
               </div>
+              {fieldErrors.schoolName && (
+                <p className="text-xs text-rose-600 font-medium mt-1">{fieldErrors.schoolName}</p>
+              )}
             </div>
           )}
 
@@ -175,11 +224,21 @@ export default function RegisterPage() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: '' }));
+                }}
                 placeholder="nama@email.com"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm transition-colors"
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                  fieldErrors.email
+                    ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                }`}
               />
             </div>
+            {fieldErrors.email && (
+              <p className="text-xs text-rose-600 font-medium mt-1">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div>
@@ -192,11 +251,21 @@ export default function RegisterPage() {
                 type="tel"
                 required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }));
+                }}
                 placeholder="081234567890"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm transition-colors"
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                  fieldErrors.phone
+                    ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                }`}
               />
             </div>
+            {fieldErrors.phone && (
+              <p className="text-xs text-rose-600 font-medium mt-1">{fieldErrors.phone}</p>
+            )}
           </div>
 
           <div>
@@ -210,11 +279,21 @@ export default function RegisterPage() {
                 required
                 minLength={8}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: '' }));
+                }}
                 placeholder="••••••••"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm transition-colors"
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                  fieldErrors.password
+                    ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                }`}
               />
             </div>
+            {fieldErrors.password && (
+              <p className="text-xs text-rose-600 font-medium mt-1">{fieldErrors.password}</p>
+            )}
           </div>
 
           <button

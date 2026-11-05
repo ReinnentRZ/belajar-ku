@@ -1,5 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import {
+  adminTransactionFilterSchema,
+  orderIdParamSchema,
   reportFilterSchema,
   reportIdParamSchema,
   resolveReportSchema,
@@ -54,6 +56,59 @@ export class AdminController {
       success: true,
       message: `Status verifikasi tutor ${updated.user.name} berhasil diperbarui menjadi ${body.isVerified ? 'Terverifikasi' : 'Belum Terverifikasi'}`,
       data: updated,
+    });
+  }
+
+  async getUsers(request: FastifyRequest, reply: FastifyReply) {
+    const query = request.query as any;
+    const data = await adminService.getUsers(query);
+    return reply.status(200).send({
+      success: true,
+      data,
+    });
+  }
+
+  async toggleUserStatus(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    const user = await adminService.toggleUserStatus(id);
+    return reply.status(200).send({
+      success: true,
+      message: `Status akun ${user.name} berhasil diubah menjadi ${user.isActive ? 'Aktif' : 'Nonaktif / Suspended'}`,
+      data: user,
+    });
+  }
+
+  // =========================================================================
+  // Transaction History & Escrow Ledger
+  // =========================================================================
+
+  async getTransactions(request: FastifyRequest, reply: FastifyReply) {
+    const query = adminTransactionFilterSchema.parse(request.query);
+    const result = await adminService.getTransactions(query);
+    return reply.status(200).send({
+      success: true,
+      data: result.items,
+      pagination: result.pagination,
+      summary: result.summary,
+    });
+  }
+
+  async getTransactionDetail(request: FastifyRequest, reply: FastifyReply) {
+    const { orderId } = orderIdParamSchema.parse(request.params);
+    const detail = await adminService.getTransactionDetail(orderId);
+    return reply.status(200).send({
+      success: true,
+      data: detail,
+    });
+  }
+
+  async confirmPaymentManual(request: FastifyRequest, reply: FastifyReply) {
+    const { orderId } = orderIdParamSchema.parse(request.params);
+    const result = await adminService.confirmPaymentManual(orderId);
+    return reply.status(200).send({
+      success: true,
+      message: 'Pembayaran transaksi berhasil dikonfirmasi lunas secara manual oleh Admin.',
+      data: result,
     });
   }
 }

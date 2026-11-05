@@ -1,7 +1,14 @@
+'use client';
+
 import { ArrowRight, Award, BookOpen, Building2, CheckCircle, Clock, FileText, Heart, Shield, Sparkles, Star, Users } from 'lucide-react';
 import Link from 'next/link';
+import React from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function HomePage() {
+  const { user } = useAuth();
+  const isParent = user?.role === 'PARENT';
+
   return (
     <div className="space-y-16 sm:space-y-24 pb-16">
       {/* Hero Section */}
@@ -11,7 +18,11 @@ export default function HomePage() {
             {/* Pill Tag */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs sm:text-sm font-semibold mb-6 shadow-sm">
               <Sparkles className="w-4 h-4 text-brand-600" />
-              <span>Platform Terpadu Les Privat Murid & Pojok Administrasi Guru</span>
+              <span>
+                {isParent
+                  ? 'Platform Terpercaya Les Privat Murid & Guru Berpengalaman'
+                  : 'Platform Terpadu Les Privat Murid & Pojok Administrasi Guru'}
+              </span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.15] mb-6">
@@ -22,11 +33,13 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg sm:text-xl text-slate-600 leading-relaxed mb-8 max-w-3xl mx-auto">
-              Solusi holistik pendidikan Indonesia: hubungkan buah hati dengan guru privat berdedikasi, atau penuhi kebutuhan administrasi & kurikulum sekolah Anda bersama konsultan berpengalaman.
+              {isParent
+                ? 'Hubungkan buah hati dengan guru les privat berdedikasi dan tersertifikasi untuk pendampingan belajar personal yang ramah anak dan aman.'
+                : 'Solusi holistik pendidikan Indonesia: hubungkan buah hati dengan guru privat berdedikasi, atau penuhi kebutuhan administrasi & kurikulum sekolah Anda bersama konsultan berpengalaman.'}
             </p>
 
-            {/* Dual-Portal Interactive Gateway Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10 text-left">
+            {/* Gateway Cards (Strictly isolate Module Card from PARENT accounts) */}
+            <div className={`grid ${isParent ? 'grid-cols-1 max-w-2xl mx-auto' : 'grid-cols-1 md:grid-cols-2'} gap-6 mt-10 text-left`}>
               {/* Portal Card A: Siswa & Les Privat */}
               <div className="relative group bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-100 hover:border-emerald-400 shadow-xl shadow-emerald-500/5 hover:shadow-emerald-500/15 transition-all duration-300 flex flex-col justify-between">
                 <div className="space-y-4">
@@ -61,7 +74,7 @@ export default function HomePage() {
                 </div>
                 <div className="mt-6 pt-4">
                   <Link
-                    href="/services?type=student"
+                    href="/services"
                     className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group-hover:gap-3"
                   >
                     <span>Jelajahi Les Privat Siswa</span>
@@ -70,48 +83,50 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Portal Card B: Pojok Administrasi Guru & Sekolah */}
-              <div className="relative group bg-white rounded-3xl p-6 sm:p-8 border-2 border-indigo-100 hover:border-indigo-400 shadow-xl shadow-indigo-500/5 hover:shadow-indigo-500/15 transition-all duration-300 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">
-                      📑 Pojok Guru & Pihak Sekolah
-                    </span>
-                    <span className="text-2xl">🏫</span>
+              {/* Portal Card B: Pojok Administrasi Guru & Sekolah (Strictly hidden for PARENT) */}
+              {!isParent && (
+                <div className="relative group bg-white rounded-3xl p-6 sm:p-8 border-2 border-indigo-100 hover:border-indigo-400 shadow-xl shadow-indigo-500/5 hover:shadow-indigo-500/15 transition-all duration-300 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">
+                        📑 Pojok Guru & Pihak Sekolah
+                      </span>
+                      <span className="text-2xl">🏫</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">
+                        Layanan Dokumen & Modul Guru
+                      </h3>
+                      <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                        Layanan pengerjaan Modul Ajar Kurikulum Merdeka, CP, ATP, LKPD, serta asistensi penyusunan SPJ / LPJ Dana BOS sesuai ARKAS.
+                      </p>
+                    </div>
+                    <ul className="space-y-2 text-xs sm:text-sm text-slate-600 pt-2 border-t border-slate-100">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                        <span>Format dokumen lengkap editable (.docx, .xlsx, .pdf)</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                        <span>Estimasi pengerjaan kilat 3 - 5 hari kerja</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                        <span>Garansi 2x revisi gratis & proteksi dana escrow 100%</span>
+                      </li>
+                    </ul>
                   </div>
-                  <div>
-                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">
-                      Layanan Dokumen & Modul Guru
-                    </h3>
-                    <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                      Layanan pengerjaan Modul Ajar Kurikulum Merdeka, CP, ATP, LKPD, serta asistensi penyusunan SPJ / LPJ Dana BOS sesuai ARKAS.
-                    </p>
+                  <div className="mt-6 pt-4">
+                    <Link
+                      href="/modules"
+                      className="w-full py-3.5 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 group-hover:gap-3"
+                    >
+                      <span>Jelajahi Dokumen & Modul Guru</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
-                  <ul className="space-y-2 text-xs sm:text-sm text-slate-600 pt-2 border-t border-slate-100">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                      <span>Format dokumen lengkap editable (.docx, .xlsx, .pdf)</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                      <span>Estimasi pengerjaan kilat 3 - 5 hari kerja</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                      <span>Garansi 2x revisi gratis & proteksi dana escrow 100%</span>
-                    </li>
-                  </ul>
                 </div>
-                <div className="mt-6 pt-4">
-                  <Link
-                    href="/services?type=teacher"
-                    className="w-full py-3.5 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 group-hover:gap-3"
-                  >
-                    <span>Jelajahi Dokumen & Modul Guru</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Trust Badges */}

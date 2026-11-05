@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sanitizeText } from '../../utils/sanitize.js';
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -12,7 +13,7 @@ export const categoryGroupEnum = z.enum([
 ]);
 
 export const createCategorySchema = z.object({
-  name: z.string().min(2, 'Category name must be at least 2 characters'),
+  name: z.string().min(2, 'Category name must be at least 2 characters').transform(sanitizeText),
   targetGrade: z.enum(['PAUD', 'TK', 'SD', 'SMP'], {
     errorMap: () => ({ message: "Target grade must be 'PAUD', 'TK', 'SD', or 'SMP'" }),
   }),
@@ -22,18 +23,19 @@ export const createCategorySchema = z.object({
 
 export const createServiceSchema = z.object({
   categoryId: z.string().uuid('Invalid category ID'),
-  title: z.string().min(3, 'Title must be at least 3 characters'),
+  title: z.string().min(3, 'Title must be at least 3 characters').transform(sanitizeText),
   serviceType: z.enum(['SESSION_BASED', 'DELIVERABLE_BASED']).optional().default('SESSION_BASED'),
-  teachingMode: z.enum(['ONLINE', 'OFFLINE_VISIT']),
+  teachingMode: z.enum(['ONLINE', 'OFFLINE_VISIT']).optional().default('ONLINE'),
   durationMinutes: z.number().int().positive('Duration must be positive in minutes').optional().default(60),
-  sessionCount: z.number().int().positive().default(1),
+  sessionCount: z.number().int().positive().optional().default(1),
   price: z.number().positive('Price must be greater than zero'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  syllabusHighlights: z.array(z.string()).optional().default([]),
-  specialAccommodations: z.string().optional(),
+  description: z.string().min(10, 'Description must be at least 10 characters').transform(sanitizeText),
+  syllabusHighlights: z.array(z.string().transform(sanitizeText)).optional().default([]),
+  specialAccommodations: z.string().optional().transform((v) => (v ? sanitizeText(v) : v)),
   estimatedDays: z.number().int().positive().optional(),
   deliverableFormats: z.array(z.string()).optional().default([]),
   maxRevisions: z.number().int().min(0).max(10).optional().default(2),
+  gradeLevel: z.enum(['PAUD', 'TK', 'SD', 'SMP']).optional(),
 });
 
 export const updateServiceSchema = createServiceSchema.partial().extend({
@@ -63,7 +65,7 @@ export const searchServicesQuerySchema = z.object({
   categorySlug: z.string().optional(),
   teachingMode: z.enum(['ONLINE', 'OFFLINE_VISIT']).optional(),
   serviceType: z.enum(['SESSION_BASED', 'DELIVERABLE_BASED']).optional(),
-  type: z.enum(['student', 'teacher']).optional(),
+  type: z.enum(['student', 'teacher', 'SESSION_BASED', 'DELIVERABLE_BASED']).optional(),
   search: z.string().optional(),
   page: z
     .string()

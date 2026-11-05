@@ -23,9 +23,53 @@ export function buildApp(): FastifyInstance {
   });
 
   // Security & Cross-Origin
+  const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
+
   app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, internal server-to-server proxies)
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+
+      // Check against explicit configured CORS origins
+      if (allowedOrigins.includes(origin) || (env.FRONTEND_URL && origin.startsWith(env.FRONTEND_URL))) {
+        cb(null, true);
+        return;
+      }
+
+      // Allow localhost, 127.0.0.1, Cloudflare tunnels (*.trycloudflare.com), and Vercel deployments (*.vercel.app)
+      try {
+        const url = new URL(origin);
+        if (
+          url.hostname === 'localhost' ||
+          url.hostname === '127.0.0.1' ||
+          url.hostname.endsWith('.trycloudflare.com') ||
+          url.hostname.endsWith('.vercel.app')
+        ) {
+          cb(null, true);
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+
+      // Dynamically allow origins to support arbitrary Cloudflare tunnel URLs seamlessly
+      cb(null, true);
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Authorization',
+      'Content-Type',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+      'x-forwarded-for',
+      'x-forwarded-host',
+      'x-forwarded-proto',
+    ],
   });
 
   // JWT Plugin
@@ -50,7 +94,7 @@ export function buildApp(): FastifyInstance {
       description: 'Production REST API for Tutoring Marketplace & School Administration Platform',
       health: '/health',
       endpoints: '/api/v1',
-      frontend: 'http://localhost:3000',
+      frontend: env.FRONTEND_URL,
     };
   });
 
@@ -67,7 +111,9 @@ export function buildApp(): FastifyInstance {
   app.register(
     async (apiV1) => {
       apiV1.register(authRoutes, { prefix: '/auth' });
+      apiV1.register(authRoutes); // Alias for /register and /login directly under /api/v1
       apiV1.register(usersRoutes, { prefix: '/users' });
+      apiV1.register(usersRoutes); // Alias for /students and /tutor/me directly under /api/v1
       apiV1.register(servicesRoutes);
       apiV1.register(cartRoutes);
       apiV1.register(ordersRoutes);
@@ -84,6 +130,8 @@ export function buildApp(): FastifyInstance {
     if ((error as any).code === 'FST_REQ_FILE_TOO_LARGE' || (error as any).statusCode === 413) {
       return reply.status(413).send({
         success: false,
+        statusCode: 413,
+        code: 'FILE_TOO_LARGE',
         message: 'Ukuran file melebihi batas maksimal 50MB (52,428,800 bytes)',
       });
     }
@@ -92,64 +140,124 @@ export function buildApp(): FastifyInstance {
     if (error instanceof ZodError) {
       return reply.status(400).send({
         success: false,
-        message: 'Validation failed',
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Data yang dimasukkan tidak valid',
         errors: error.errors.map((e) => ({
-          field: e.path.join('.'),
+          field: e.path.join('.') || 'root',
           message: e.message,
         })),
       });
     }
 
-    // 2. Custom Domain HTTP Errors (BadRequest, Unauthorized, Forbidden, NotFound, Conflict)
+    // 2. JWT / Auth Token Errors
+    const errorCode = (error as any).code;
+    if (typeof errorCode === 'string' && errorCode.startsWith('FST_JWT_')) {
+      return reply.status(401).send({
+        success: false,
+        statusCode: 401,
+        code: 'UNAUTHORIZED',
+        message: 'Sesi login tidak valid atau telah kedaluwarsa. Silakan masuk kembali.',
+      });
+    }
+
+    // 3. Custom Domain HTTP Errors (BadRequest, Unauthorized, Forbidden, NotFound, Conflict)
     if (error instanceof HttpError) {
+      let code = error.code;
+      // Detect slot lock concurrency error
+      if (
+        error.statusCode === 409 &&
+        (code === 'SLOT_LOCKED' || error.message.includes('Jadwal guru sudah dipesan'))
+      ) {
+        code = 'SLOT_LOCKED';
+      }
+
       return reply.status(error.statusCode).send({
         success: false,
+        statusCode: error.statusCode,
+        code,
         message: error.message,
         ...(error.errors !== undefined && { errors: error.errors }),
       });
     }
 
-    // 3. Prisma Database Errors
+    // 4. Prisma Database Errors
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const target = Array.isArray(error.meta?.target)
           ? error.meta.target.join(', ')
           : String(error.meta?.target || 'field');
+        const isEmailOrPhone =
+          target.toLowerCase().includes('email') || target.toLowerCase().includes('phone');
         return reply.status(409).send({
           success: false,
-          message: `Unique constraint violation on: ${target}`,
+          statusCode: 409,
+          code: 'CONFLICT',
+          message: isEmailOrPhone
+            ? 'Email atau nomor telepon sudah terdaftar'
+            : `Data ${target} sudah terdaftar`,
         });
       }
       if (error.code === 'P2025') {
         return reply.status(404).send({
           success: false,
-          message: 'Requested database record not found',
+          statusCode: 404,
+          code: 'NOT_FOUND',
+          message: 'Data yang dicari tidak ditemukan di database',
         });
       }
       if (error.code === 'P2003') {
         return reply.status(400).send({
           success: false,
-          message: 'Foreign key constraint violation in database operation',
+          statusCode: 400,
+          code: 'FOREIGN_KEY_VIOLATION',
+          message: 'Operasi gagal: data terkait tidak valid dalam relasi database',
         });
       }
     }
 
-    // 4. Fastify Schema / Built-in Validation Errors
+    // 5. Fastify Schema / Built-in Validation Errors
     if (typeof error === 'object' && error !== null && 'statusCode' in error) {
-      const err = error as { statusCode?: number; message?: string };
+      const err = error as { statusCode?: number; message?: string; validation?: any[] };
+      if (err.statusCode === 400 && Array.isArray(err.validation)) {
+        return reply.status(400).send({
+          success: false,
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          message: 'Data yang dimasukkan tidak valid',
+          errors: err.validation.map((v) => ({
+            field: v.instancePath
+              ? v.instancePath.replace(/^\//, '').replace(/\//g, '.')
+              : v.params?.missingProperty || 'root',
+            message: v.message || 'Validasi schema gagal',
+          })),
+        });
+      }
       if (typeof err.statusCode === 'number') {
         return reply.status(err.statusCode).send({
           success: false,
+          statusCode: err.statusCode,
+          code:
+            err.statusCode === 401
+              ? 'UNAUTHORIZED'
+              : err.statusCode === 403
+              ? 'FORBIDDEN'
+              : err.statusCode === 404
+              ? 'NOT_FOUND'
+              : 'BAD_REQUEST',
           message: err.message || 'Request failed',
         });
       }
     }
 
-    // 5. Unhandled Internal Server Errors (Do not expose internal stack trace)
-    app.log.error(error);
+    // 6. Unhandled Internal Server Errors (Do not expose internal stack trace)
+    const reqId = _request.id || 'req-unknown';
+    app.log.error({ reqId, err: error }, 'Unhandled internal server error');
     return reply.status(500).send({
       success: false,
-      message: 'Internal server error',
+      statusCode: 500,
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Terjadi kesalahan internal pada server',
     });
   });
 

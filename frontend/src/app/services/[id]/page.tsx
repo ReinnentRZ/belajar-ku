@@ -1,16 +1,20 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertCircle,
+  AlertTriangle,
   Award,
   BookOpen,
   Building2,
   Calendar,
+  Check,
   CheckCircle2,
   Clock,
   FileText,
   GraduationCap,
   Heart,
+  Info,
   MapPin,
   Plus,
   RefreshCw,
@@ -22,16 +26,37 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import api from '../../../lib/api';
+import { useCart } from '../../../context/CartContext';
+import api, { getApiErrorMessage } from '../../../lib/api';
 import { DAY_NAMES, formatRupiah } from '../../../lib/utils';
+
+interface SlotAvailability {
+  id?: string;
+  dayOfWeek?: number;
+  startTime: string;
+  endTime: string;
+}
+
+function getDayOfWeek(dateStr: string): number {
+  if (!dateStr) return 0;
+  const parts = dateStr.split('-');
+  const y = parseInt(parts[0] || '1970', 10);
+  const m = parseInt(parts[1] || '1', 10);
+  const d = parseInt(parts[2] || '1', 10);
+  const dateObj = new Date(y, m - 1, d);
+  const jsDay = dateObj.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
+  return jsDay === 0 ? 7 : jsDay;
+}
 
 export default function ServiceDetailPage() {
   const params = useParams();
   const serviceId = params?.id as string;
   const router = useRouter();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { addToCartSync } = useCart();
 
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [teachingAddress, setTeachingAddress] = useState('');
@@ -40,7 +65,10 @@ export default function ServiceDetailPage() {
     Array<{ date: string; startTime: string; endTime: string }>
   >([]);
   const [newSlotDate, setNewSlotDate] = useState('');
-  const [selectedAvailTime, setSelectedAvailTime] = useState<{ startTime: string; endTime: string } | null>(null);
+  const [selectedAvailTime, setSelectedAvailTime] = useState<SlotAvailability | null>(null);
+  const [customStartTime, setCustomStartTime] = useState('09:00');
+  const [customEndTime, setCustomEndTime] = useState('10:30');
+  const [slotErrorMsg, setSlotErrorMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -64,31 +92,103 @@ export default function ServiceDetailPage() {
     enabled: !!user && user.role === 'PARENT',
   });
 
+  // Auto-select student if parent has exactly one student profile
+  useEffect(() => {
+    if (students && students.length === 1 && !selectedStudentId) {
+      setSelectedStudentId(students[0].id);
+    }
+  }, [students, selectedStudentId]);
+
+  // Route Guard: Hard redirect PARENT users away from B2B deliverable / module services
+  useEffect(() => {
+    if (
+      user?.role === 'PARENT' &&
+      service &&
+      (service.serviceType === 'DELIVERABLE_BASED' ||
+        service.category?.categoryGroup === 'ADMINISTRASI_GURU')
+    ) {
+      router.replace('/services');
+    }
+  }, [user, service, router]);
+
+  // Route Guard: Hard redirect INSTITUTION users away from B2C session-based tutoring
+  useEffect(() => {
+    if (
+      user?.role === 'INSTITUTION' &&
+      service &&
+      service.serviceType === 'SESSION_BASED'
+    ) {
+      router.replace('/modules');
+    }
+  }, [user, service, router]);
+
   const tutor = service?.tutor;
   const tutorUser = tutor?.user;
   const availabilities = tutor?.availabilities || [];
 
   const handleAddSlot = () => {
+    setSlotErrorMsg('');
+
     if (!newSlotDate) {
-      alert('Pilih tanggal belajar terlebih dahulu');
-      return;
-    }
-    if (!selectedAvailTime) {
-      alert('Pilih jam belajar yang tersedia');
+      setSlotErrorMsg('Pilih tanggal belajar terlebih dahulu.');
       return;
     }
 
+    // Check if date is in the past
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (newSlotDate < todayStr) {
+      setSlotErrorMsg('Tanggal belajar tidak boleh di masa lalu.');
+      return;
+    }
+
+    let slotStartTime = '';
+    let slotEndTime = '';
+
+    if (availabilities.length === 0) {
+      if (!customStartTime || !customEndTime) {
+        setSlotErrorMsg('Tentukan jam mulai dan jam selesai belajar.');
+        return;
+      }
+      if (customStartTime >= customEndTime) {
+        setSlotErrorMsg('Jam selesai harus lebih akhir dari jam mulai.');
+        return;
+      }
+      slotStartTime = customStartTime;
+      slotEndTime = customEndTime;
+    } else {
+      if (!selectedAvailTime) {
+        setSlotErrorMsg('Pilih salah satu jam belajar guru yang tersedia.');
+        return;
+      }
+
+      // Check day matching
+      if (selectedAvailTime.dayOfWeek) {
+        const chosenDayOfWeek = getDayOfWeek(newSlotDate);
+        if (chosenDayOfWeek !== selectedAvailTime.dayOfWeek) {
+          const chosenDayName = DAY_NAMES[chosenDayOfWeek] || `Hari ${chosenDayOfWeek}`;
+          const tutorDayName = DAY_NAMES[selectedAvailTime.dayOfWeek] || `Hari ${selectedAvailTime.dayOfWeek}`;
+          setSlotErrorMsg(
+            `Tanggal ${newSlotDate} jatuh pada hari ${chosenDayName}, sedangkan guru hanya membuka jadwal pada hari ${tutorDayName}. Harap pilih tanggal yang tepat.`
+          );
+          return;
+        }
+      }
+
+      slotStartTime = selectedAvailTime.startTime;
+      slotEndTime = selectedAvailTime.endTime;
+    }
+
     if (selectedSlots.length >= service.sessionCount) {
-      alert(`Paket ini hanya untuk ${service.sessionCount} sesi.`);
+      setSlotErrorMsg(`Paket ini hanya untuk ${service.sessionCount} sesi belajar.`);
       return;
     }
 
     // Check duplicate
     const exists = selectedSlots.some(
-      (s) => s.date === newSlotDate && s.startTime === selectedAvailTime.startTime
+      (s) => s.date === newSlotDate && s.startTime === slotStartTime
     );
     if (exists) {
-      alert('Slot ini sudah Anda tambahkan.');
+      setSlotErrorMsg(`Slot pada tanggal ${newSlotDate} jam ${slotStartTime} sudah ditambahkan ke jadwal.`);
       return;
     }
 
@@ -96,10 +196,11 @@ export default function ServiceDetailPage() {
       ...selectedSlots,
       {
         date: newSlotDate,
-        startTime: selectedAvailTime.startTime,
-        endTime: selectedAvailTime.endTime,
+        startTime: slotStartTime,
+        endTime: slotEndTime,
       },
     ]);
+    setSlotErrorMsg('');
   };
 
   const handleRemoveSlot = (index: number) => {
@@ -123,12 +224,17 @@ export default function ServiceDetailPage() {
 
     if (!isDeliverable) {
       if (!selectedStudentId) {
-        setErrorMsg('Pilih profil anak yang akan mengikuti les.');
+        setErrorMsg('Pilih profil anak yang akan mengikuti les terlebih dahulu.');
         return;
       }
 
       if (selectedSlots.length !== service.sessionCount) {
-        setErrorMsg(`Pilih tepat ${service.sessionCount} jadwal sesi belajar.`);
+        const remaining = service.sessionCount - selectedSlots.length;
+        if (remaining > 0) {
+          setErrorMsg(`Pilih ${remaining} jadwal sesi belajar lagi (total harus ${service.sessionCount} sesi).`);
+        } else {
+          setErrorMsg(`Pilih tepat ${service.sessionCount} jadwal sesi belajar.`);
+        }
         return;
       }
 
@@ -148,10 +254,26 @@ export default function ServiceDetailPage() {
         teachingAddress: !isDeliverable && service.teachingMode === 'OFFLINE_VISIT' ? teachingAddress : undefined,
       });
 
+      // Synchronously write to localStorage and notify CartContext
+      addToCartSync({
+        serviceId: service.id,
+        studentId: isDeliverable ? undefined : selectedStudentId,
+        selectedSlots: isDeliverable ? [] : selectedSlots,
+        notes: isDeliverable ? deliverableNotes : undefined,
+        teachingAddress: !isDeliverable && service.teachingMode === 'OFFLINE_VISIT' ? teachingAddress : undefined,
+      });
+
+      // Invalidate cart query cache so the cart page renders immediately without stale cache
+      await queryClient.invalidateQueries({ queryKey: ['cart'] });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('cart-updated'));
+      }
+
       router.push('/cart');
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Gagal menambahkan ke keranjang.';
-      setErrorMsg(message);
+      const parsed = getApiErrorMessage(err);
+      setErrorMsg(parsed.message || 'Gagal menambahkan ke keranjang.');
     } finally {
       setIsSubmitting(false);
     }
@@ -161,6 +283,20 @@ export default function ServiceDetailPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center text-slate-500">
         Memuat detail layanan les...
+      </div>
+    );
+  }
+
+  // Prevent flash of content if PARENT is being redirected away from a deliverable service
+  if (
+    user?.role === 'PARENT' &&
+    service &&
+    (service.serviceType === 'DELIVERABLE_BASED' ||
+      service.category?.categoryGroup === 'ADMINISTRASI_GURU')
+  ) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-brand-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -420,7 +556,25 @@ export default function ServiceDetailPage() {
                   </div>
                 )}
 
-                {isDeliverable ? (
+                {user?.role === 'TUTOR' || user?.role === 'ADMIN' ? (
+                  <div className="p-6 bg-amber-50 rounded-2xl border border-amber-200 text-center space-y-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-xl shadow-inner">
+                      ⚠️
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Mode Pemesanan Terbatas</h4>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Anda masuk sebagai <strong>{user.role === 'TUTOR' ? 'Guru' : 'Admin'}</strong>. Mode pemesanan hanya tersedia untuk akun Orang Tua atau Institusi.
+                      </p>
+                    </div>
+                    <Link
+                      href={user.role === 'TUTOR' ? '/tutor/dashboard' : '/admin/dashboard'}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
+                    >
+                      <span>Buka Dashboard {user.role === 'TUTOR' ? 'Guru' : 'Admin'}</span>
+                    </Link>
+                  </div>
+                ) : isDeliverable ? (
                   <div className="space-y-5">
                     {/* Deliverable Specifications Card */}
                     <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-100 space-y-2.5 text-xs">
@@ -480,6 +634,14 @@ export default function ServiceDetailPage() {
                       </p>
                     </div>
 
+                    {/* Error Message for Deliverable */}
+                    {errorMsg && (
+                      <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span className="font-medium leading-relaxed">{errorMsg}</span>
+                      </div>
+                    )}
+
                     {/* Add Deliverable to Cart Button */}
                     <button
                       type="button"
@@ -536,65 +698,177 @@ export default function ServiceDetailPage() {
                         <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                           2. Pilih {service.sessionCount} Jadwal Sesi
                         </label>
-                        <span className="text-xs font-semibold text-brand-600">
+                        <span className={`text-xs font-bold ${
+                          selectedSlots.length === service.sessionCount
+                            ? 'text-emerald-600'
+                            : 'text-brand-600'
+                        }`}>
                           {selectedSlots.length} / {service.sessionCount} Terpilih
                         </span>
                       </div>
 
                       {/* Time slot picker */}
-                      <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
+                      <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                        {/* Date Input */}
                         <div>
-                          <span className="text-[11px] font-semibold text-slate-500 block mb-1">
-                            Pilih Tanggal:
+                          <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                            Pilih Tanggal Belajar:
                           </span>
                           <input
                             type="date"
                             min={new Date().toISOString().split('T')[0]}
                             value={newSlotDate}
-                            onChange={(e) => setNewSlotDate(e.target.value)}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                            onChange={(e) => {
+                              setNewSlotDate(e.target.value);
+                              setSlotErrorMsg('');
+                            }}
+                            className={`w-full px-3 py-2 rounded-xl border text-xs bg-white focus:outline-none transition-colors ${
+                              newSlotDate && selectedAvailTime?.dayOfWeek && getDayOfWeek(newSlotDate) !== selectedAvailTime.dayOfWeek
+                                ? 'border-rose-300 bg-rose-50/30'
+                                : newSlotDate && selectedAvailTime?.dayOfWeek && getDayOfWeek(newSlotDate) === selectedAvailTime.dayOfWeek
+                                ? 'border-emerald-300 bg-emerald-50/30'
+                                : 'border-slate-300'
+                            }`}
                           />
+                          {/* Inline Day Matching Guidance */}
+                          {newSlotDate && (
+                            <div className="mt-1.5">
+                              {(() => {
+                                const chosenDay = getDayOfWeek(newSlotDate);
+                                const chosenDayName = DAY_NAMES[chosenDay] || `Hari ${chosenDay}`;
+
+                                if (selectedAvailTime?.dayOfWeek) {
+                                  const tutorDayName = DAY_NAMES[selectedAvailTime.dayOfWeek] || `Hari ${selectedAvailTime.dayOfWeek}`;
+                                  if (chosenDay !== selectedAvailTime.dayOfWeek) {
+                                    return (
+                                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-200">
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                        <span>
+                                          Tanggal {newSlotDate} jatuh pada hari <strong>{chosenDayName}</strong>, sedangkan guru membuka jadwal pada hari <strong>{tutorDayName}</strong>.
+                                        </span>
+                                      </div>
+                                    );
+                                  } else {
+                                    return (
+                                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                                        <Check className="w-3.5 h-3.5 shrink-0" />
+                                        <span>
+                                          ✓ Tanggal {newSlotDate} cocok dengan hari mengajar guru ({chosenDayName}).
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                }
+
+                                return (
+                                  <div className="text-[11px] text-slate-500">
+                                    Hari yang dipilih: <span className="font-semibold text-slate-800">{chosenDayName}</span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
 
+                        {/* Availability Picker */}
                         <div>
-                          <span className="text-[11px] font-semibold text-slate-500 block mb-1">
-                            Jam Tersedia Guru:
+                          <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                            {availabilities.length === 0 ? 'Tentukan Jam Belajar:' : 'Jam Tersedia Guru:'}
                           </span>
-                          <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto">
-                            {availabilities.length === 0 ? (
-                              <div className="text-xs text-slate-400 italic">Jadwal guru fleksibel</div>
-                            ) : (
-                              availabilities.map((av: any) => {
+
+                          {availabilities.length === 0 ? (
+                            <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-100 space-y-2">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-900">
+                                <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Jadwal Guru Fleksibel</span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-relaxed">
+                                Guru ini menerima jadwal fleksibel. Silakan atur jam les yang Anda inginkan:
+                              </p>
+                              <div className="grid grid-cols-2 gap-2 pt-1">
+                                <div>
+                                  <span className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Jam Mulai</span>
+                                  <input
+                                    type="time"
+                                    value={customStartTime}
+                                    onChange={(e) => setCustomStartTime(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-medium"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Jam Selesai</span>
+                                  <input
+                                    type="time"
+                                    value={customEndTime}
+                                    onChange={(e) => setCustomEndTime(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-medium"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto">
+                              {availabilities.map((av: any) => {
                                 const isChosen =
-                                  selectedAvailTime?.startTime === av.startTime &&
-                                  selectedAvailTime?.endTime === av.endTime;
+                                  selectedAvailTime?.id === av.id ||
+                                  (selectedAvailTime?.dayOfWeek === av.dayOfWeek &&
+                                    selectedAvailTime?.startTime === av.startTime &&
+                                    selectedAvailTime?.endTime === av.endTime);
+
+                                const avDayName = DAY_NAMES[av.dayOfWeek] || `Hari ${av.dayOfWeek}`;
+                                const dateMatchesThis = newSlotDate ? getDayOfWeek(newSlotDate) === av.dayOfWeek : false;
 
                                 return (
                                   <button
                                     key={av.id}
                                     type="button"
-                                    onClick={() => setSelectedAvailTime({ startTime: av.startTime, endTime: av.endTime })}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between border transition-all ${
+                                    onClick={() => {
+                                      setSelectedAvailTime({
+                                        id: av.id,
+                                        dayOfWeek: av.dayOfWeek,
+                                        startTime: av.startTime,
+                                        endTime: av.endTime,
+                                      });
+                                      setSlotErrorMsg('');
+                                    }}
+                                    className={`px-3 py-2 rounded-xl text-xs font-medium text-left flex items-center justify-between border transition-all ${
                                       isChosen
                                         ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                                        : dateMatchesThis
+                                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:border-emerald-500'
                                         : 'bg-white text-slate-700 border-slate-200 hover:border-brand-400'
                                     }`}
                                   >
-                                    <span>{DAY_NAMES[av.dayOfWeek] || `Hari ${av.dayOfWeek}`}</span>
-                                    <span className="font-semibold">{av.startTime} - {av.endTime}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold">{avDayName}</span>
+                                      {dateMatchesThis && !isChosen && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-200/60 text-emerald-800 font-semibold">
+                                          Cocok dg Tanggal
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-semibold font-mono">{av.startTime} - {av.endTime}</span>
                                   </button>
                                 );
-                              })
-                            )}
-                          </div>
+                              })}
+                            </div>
+                          )}
                         </div>
+
+                        {/* Inline Slot Error */}
+                        {slotErrorMsg && (
+                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <span className="font-medium leading-relaxed">{slotErrorMsg}</span>
+                          </div>
+                        )}
 
                         <button
                           type="button"
                           onClick={handleAddSlot}
-                          className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                          className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          <Plus className="w-4 h-4" />
                           Tambahkan ke Jadwal Sesi
                         </button>
                       </div>
@@ -602,23 +876,33 @@ export default function ServiceDetailPage() {
                       {/* List of chosen slots */}
                       {selectedSlots.length > 0 && (
                         <div className="space-y-1.5">
-                          {selectedSlots.map((slot, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between p-2.5 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900"
-                            >
-                              <span className="font-semibold">
-                                Sesi {idx + 1}: {slot.date} ({slot.startTime} - {slot.endTime})
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSlot(idx)}
-                                className="text-rose-600 font-bold hover:underline"
+                          {selectedSlots.map((slot, idx) => {
+                            const slotDay = getDayOfWeek(slot.date);
+                            const dayName = DAY_NAMES[slotDay] || '';
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-2.5 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900"
                               >
-                                Batal
-                              </button>
-                            </div>
-                          ))}
+                                <div className="space-y-0.5">
+                                  <div className="font-bold">
+                                    Sesi {idx + 1}: {dayName && `${dayName}, `}{slot.date}
+                                  </div>
+                                  <div className="text-[11px] text-brand-700 font-mono">
+                                    {slot.startTime} - {slot.endTime} WIB
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSlot(idx)}
+                                  className="text-rose-600 font-bold hover:underline px-2 py-1"
+                                >
+                                  Batal
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -637,6 +921,37 @@ export default function ServiceDetailPage() {
                           placeholder="Jl. Mawar No. 15, RT 02/05, Kelurahan..."
                           className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                         />
+                      </div>
+                    )}
+
+                    {/* Inline Form Completion Status / Checklist */}
+                    {user?.role === 'PARENT' && (
+                      <div className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5 pt-1">
+                        {!selectedStudentId ? (
+                          <span className="text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> Langkah 1: Pilih profil anak terlebih dahulu
+                          </span>
+                        ) : selectedSlots.length < service.sessionCount ? (
+                          <span className="text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> Langkah 2: Tambahkan {service.sessionCount - selectedSlots.length} jadwal sesi lagi
+                          </span>
+                        ) : service.teachingMode === 'OFFLINE_VISIT' && !teachingAddress.trim() ? (
+                          <span className="text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> Langkah 3: Masukkan alamat rumah kunjungan
+                          </span>
+                        ) : (
+                          <span className="text-emerald-600 flex items-center gap-1 font-semibold">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Semua data lengkap, siap ditambahkan
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Primary Inline Error Message above button */}
+                    {errorMsg && (
+                      <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span className="font-medium leading-relaxed">{errorMsg}</span>
                       </div>
                     )}
 

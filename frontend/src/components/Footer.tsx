@@ -1,7 +1,13 @@
-import { BookOpen, GraduationCap, Heart, ShieldCheck } from 'lucide-react';
+'use client';
+
+import { BookOpen, Building2, GraduationCap, Heart, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '../context/AuthContext';
 
 export function Footer() {
+  const { user } = useAuth();
+  const isParent = user?.role === 'PARENT';
+
   return (
     <footer className="bg-slate-900 text-slate-400 text-sm mt-auto border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -50,25 +56,40 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Account */}
+          {/* Layanan */}
           <div>
             <h4 className="text-white font-semibold mb-3">Layanan</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/register" className="hover:text-white transition-colors">
-                  Daftar Jadi Guru / Tutor
-                </Link>
-              </li>
-              <li>
-                <Link href="/register" className="hover:text-white transition-colors">
-                  Daftar Sebagai Orang Tua
-                </Link>
-              </li>
-              <li>
                 <Link href="/services" className="hover:text-white transition-colors">
-                  Jelajahi Katalog Les
+                  Katalog Les Privat
                 </Link>
               </li>
+              {/* Strictly hidden for PARENT role */}
+              {!isParent && (
+                <li>
+                  <Link href="/modules" className="hover:text-white transition-colors flex items-center gap-1.5">
+                    <span>Modul & Dokumen Sekolah</span>
+                    <span className="px-1.5 py-0.5 bg-indigo-900 text-indigo-300 text-[10px] font-bold rounded">
+                      B2B
+                    </span>
+                  </Link>
+                </li>
+              )}
+              {!user && (
+                <>
+                  <li>
+                    <Link href="/register" className="hover:text-white transition-colors">
+                      Daftar Sebagai Orang Tua
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/register" className="hover:text-white transition-colors">
+                      Daftar Jadi Guru / Tutor
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>

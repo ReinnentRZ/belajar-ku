@@ -35,6 +35,13 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     ordersController.cancelOrder
   );
 
+  // Instant payment simulation for dev/demo mode
+  fastify.post(
+    '/orders/:id/simulate-payment',
+    { preHandler: [authenticate] },
+    ordersController.simulatePayment
+  );
+
   // =========================================================================
   // Deliverable Escrow Endpoints
   // =========================================================================

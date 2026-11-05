@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ReportSessionModal } from '../../../components/ReportSessionModal';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../lib/api';
@@ -31,6 +31,13 @@ export default function ParentDashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuth();
+
+  // Route Guard: Silently redirect INSTITUTION accounts to dedicated School Dashboard
+  useEffect(() => {
+    if (!isAuthLoading && user?.role === 'INSTITUTION') {
+      router.replace('/institution/dashboard');
+    }
+  }, [user, isAuthLoading, router]);
 
   // Modal State for adding student
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
@@ -221,6 +228,32 @@ export default function ParentDashboardPage() {
           </button>
         )}
       </div>
+
+      {/* Pending Payment Notification Banner */}
+      {myOrders.some((o: any) => o.status === 'WAITING_PAYMENT') && (
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-3xl p-6 text-white shadow-lg shadow-orange-500/10 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm sm:text-base">
+                Menunggu Pembayaran Tagihan Les
+              </h3>
+              <p className="text-xs text-amber-50 mt-0.5">
+                Anda memiliki {myOrders.filter((o: any) => o.status === 'WAITING_PAYMENT').length} pesanan yang belum dibayar. Selesaikan pembayaran via QRIS/VA agar jadwal sesi belajar terkonfirmasi.
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/parent/orders/${myOrders.find((o: any) => o.status === 'WAITING_PAYMENT')?.id}`}
+            className="px-5 py-2.5 rounded-xl bg-white text-orange-700 font-bold text-xs shadow-md hover:bg-orange-50 transition-all shrink-0 flex items-center gap-1.5"
+          >
+            <span>Buka Tagihan & QRIS</span>
+            <span>→</span>
+          </Link>
+        </div>
+      )}
       {/* Deliverable Orders Section (Prominent for Institution or when Deliverable Orders exist) */}
       {(user.role === 'INSTITUTION' || deliverableOrders.length > 0) && (
         <div className="space-y-4">

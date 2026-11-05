@@ -1,4 +1,5 @@
 import prisma from '../../config/database.js';
+import { isSlotMatchingAvailability } from '../../utils/date.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors.js';
 import { AddToCartInput } from './cart.schema.js';
 
@@ -52,6 +53,40 @@ export class CartService {
         throw new BadRequestError(
           `This service requires exactly ${service.sessionCount} scheduled slot(s), but ${(input.selectedSlots || []).length} were selected`
         );
+      }
+
+      // Check duplicate slot times within selectedSlots
+      const seenSlots = new Set<string>();
+      for (const slot of input.selectedSlots || []) {
+        const slotKey = `${slot.date}_${slot.startTime}`;
+        if (seenSlots.has(slotKey)) {
+          throw new BadRequestError(`Terdapat jadwal sesi ganda pada tanggal ${slot.date} jam ${slot.startTime}`);
+        }
+        seenSlots.add(slotKey);
+      }
+
+      // Validate session slot dates match tutor's configured weekly availability
+      const tutorAvailabilities = await prisma.tutorAvailability.findMany({
+        where: {
+          tutorId: service.tutorId,
+          isActive: true,
+        },
+      });
+
+      if (tutorAvailabilities.length > 0) {
+        for (const slot of input.selectedSlots || []) {
+          const match = tutorAvailabilities.some((avail) =>
+            isSlotMatchingAvailability(slot, avail)
+          );
+
+          if (!match) {
+            throw new BadRequestError(
+              `Jadwal sesi pada tanggal ${slot.date} tidak sesuai dengan hari mengajar guru.`,
+              undefined,
+              'INVALID_SCHEDULE_DATE'
+            );
+          }
+        }
       }
     } else {
       // If deliverable based and studentId is provided, verify it if belongs to user

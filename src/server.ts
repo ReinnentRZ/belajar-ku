@@ -55,7 +55,7 @@ async function main() {
   try {
     const address = await app.listen({
       port: env.PORT,
-      host: '0.0.0.0',
+      host: env.HOST,
     });
     console.log(`🚀 Belajar-Ku API Server is running at ${address}`);
     console.log(`📋 Environment: ${env.NODE_ENV}`);

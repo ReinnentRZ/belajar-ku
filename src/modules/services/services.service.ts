@@ -90,9 +90,122 @@ export class ServicesService {
       where: { tutorId: tutorProfile.id },
       include: {
         category: true,
+        _count: {
+          select: {
+            orderItems: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getTutorBookings(tutorUserId: string) {
+    const tutorProfile = await prisma.tutorProfile.findUnique({
+      where: { userId: tutorUserId },
+    });
+
+    if (!tutorProfile) {
+      throw new NotFoundError('Tutor profile not found');
+    }
+
+    // 1. Fetch all booking sessions
+    const sessions = await prisma.bookingSession.findMany({
+      where: { tutorId: tutorProfile.id },
+      include: {
+        student: {
+          include: {
+            parent: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+              },
+            },
+          },
+        },
+        orderItem: {
+          include: {
+            service: {
+              include: {
+                category: true,
+              },
+            },
+            order: true,
+          },
+        },
+      },
+      orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
+    });
+
+    // 2. Fetch all deliverable orders for services owned by this tutor
+    const deliverableOrders = await prisma.order.findMany({
+      where: {
+        items: {
+          some: {
+            service: {
+              tutorId: tutorProfile.id,
+              serviceType: 'DELIVERABLE_BASED',
+            },
+          },
+        },
+      },
+      include: {
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            schoolName: true,
+          },
+        },
+        items: {
+          include: {
+            service: true,
+          },
+        },
+        attachments: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formattedSessions = sessions.map((s) => ({
+      id: s.id,
+      sessionNumber: s.sessionNumber,
+      scheduledDate: s.scheduledDate,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      status: s.status,
+      childName: s.student?.studentName || 'Murid Belajar-Ku',
+      gradeLevel: s.student?.gradeLevel || 'SD',
+      learningNotes: s.student?.learningNotes || s.orderItem?.notes || '',
+      parentName: s.student?.parent?.name || 'Orang Tua',
+      parentPhone: s.student?.parent?.phone || '',
+      parentEmail: s.student?.parent?.email || '',
+      serviceTitle: s.orderItem?.service?.title || 'Layanan Les',
+      serviceType: s.orderItem?.service?.serviceType || 'SESSION_BASED',
+      teachingMode: s.orderItem?.service?.teachingMode || 'ONLINE',
+      orderId: s.orderItem?.orderId,
+      invoiceNumber: s.orderItem?.order?.invoiceNumber,
+      orderStatus: s.orderItem?.order?.status,
+      priceSnapshot: s.orderItem?.priceSnapshot,
+      hasReport: !!s.learningReport,
+      reportNotes: s.learningReport,
+    }));
+
+    return {
+      summary: {
+        totalBookings: sessions.length + deliverableOrders.length,
+        upcomingSessions: sessions.filter((s) => s.status === 'SCHEDULED').length,
+        completedSessions: sessions.filter((s) => s.status === 'COMPLETED').length,
+        disputedSessions: sessions.filter((s) => s.status === 'DISPUTED').length,
+        deliverablesPending: deliverableOrders.filter((o) => o.deliverableStatus === 'AWAITING_DELIVERY').length,
+      },
+      sessions: formattedSessions,
+      deliverables: deliverableOrders,
+    };
   }
 
   async getServiceById(serviceId: string) {

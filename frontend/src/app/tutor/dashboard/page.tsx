@@ -295,6 +295,69 @@ export default function TutorDashboardPage() {
         </div>
       </div>
 
+      {/* Quick Access Action Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link
+          href="/tutor/bookings"
+          className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-brand-300 shadow-sm hover:shadow-md transition-all group flex items-center gap-3.5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-105 transition-transform flex items-center justify-center font-bold shrink-0">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-slate-800 truncate group-hover:text-brand-600 transition-colors">
+              Pesanan Masuk
+            </div>
+            <div className="text-[11px] text-slate-400 truncate">Jadwal & chat murid</div>
+          </div>
+        </Link>
+
+        <Link
+          href="/tutor/services"
+          className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-brand-300 shadow-sm hover:shadow-md transition-all group flex items-center gap-3.5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 group-hover:scale-105 transition-transform flex items-center justify-center font-bold shrink-0">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-slate-800 truncate group-hover:text-brand-600 transition-colors">
+              Layanan Saya
+            </div>
+            <div className="text-[11px] text-slate-400 truncate">Katalog & tarif jasa</div>
+          </div>
+        </Link>
+
+        <Link
+          href="/tutor/profile"
+          className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-brand-300 shadow-sm hover:shadow-md transition-all group flex items-center gap-3.5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 group-hover:scale-105 transition-transform flex items-center justify-center font-bold shrink-0">
+            <User className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-slate-800 truncate group-hover:text-brand-600 transition-colors">
+              Profil & Slot Waktu
+            </div>
+            <div className="text-[11px] text-slate-400 truncate">Atur jam ketersediaan</div>
+          </div>
+        </Link>
+
+        <Link
+          href="/tutor/services/new"
+          className="p-4 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white shadow-md shadow-brand-500/20 transition-all flex items-center gap-3.5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold shrink-0">
+            <Plus className="w-5 h-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-extrabold truncate">
+              + Buat Layanan
+            </div>
+            <div className="text-[11px] text-brand-100 truncate">Buka les baru</div>
+          </div>
+        </Link>
+      </div>
+
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-1 text-sm font-semibold">
         <button

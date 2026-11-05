@@ -3,6 +3,18 @@ set -e
 
 echo "🚀 [entrypoint] Initializing Belajar-Ku API container..."
 
+# If DATABASE_URL or REDIS_URL points to localhost/127.0.0.1 from a shared host .env file,
+# automatically rewrite them to point to the docker container services 'postgres' / 'redis'
+if echo "$DATABASE_URL" | grep -qE '@(localhost|127\.0\.0\.1):'; then
+  echo "⚠️  [entrypoint] Detected localhost in DATABASE_URL inside Docker container. Remapping to postgres..."
+  export DATABASE_URL=$(echo "$DATABASE_URL" | sed -E 's/@(localhost|127\.0\.0\.1):/@postgres:/')
+fi
+
+if echo "$REDIS_URL" | grep -qE '://(localhost|127\.0\.0\.1):'; then
+  echo "⚠️  [entrypoint] Detected localhost in REDIS_URL inside Docker container. Remapping to redis..."
+  export REDIS_URL=$(echo "$REDIS_URL" | sed -E 's/:\/\/(localhost|127\.0\.0\.1):/:\/\/redis:/')
+fi
+
 # Extract host and port from DATABASE_URL if available, or default to postgres:5432
 DB_HOST="${DB_HOST:-postgres}"
 DB_PORT="${DB_PORT:-5432}"

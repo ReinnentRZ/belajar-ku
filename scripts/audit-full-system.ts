@@ -7,10 +7,13 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
 import Redis from 'ioredis';
 
+const isDocker = fs.existsSync('/.dockerenv');
 const BASE_URL = process.env.API_URL || 'http://localhost:5000';
-const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379';
+const rawRedisUrl = process.env.REDIS_URL || (isDocker ? 'redis://redis:6379' : 'redis://localhost:6379');
+const REDIS_URL = isDocker ? rawRedisUrl.replace('localhost', 'redis').replace('127.0.0.1', 'redis') : rawRedisUrl;
 
 const prisma = new PrismaClient();
 const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 3 });
@@ -163,6 +166,11 @@ async function cleanupPreviousAuditData() {
 
     if (tutorIds.length > 0) {
       await prisma.tutorAvailability.deleteMany({ where: { tutorId: { in: tutorIds } } });
+      await prisma.cartItem.deleteMany({ where: { service: { tutorId: { in: tutorIds } } } });
+      await prisma.sessionReport.deleteMany({ where: { session: { tutor: { id: { in: tutorIds } } } } });
+      await prisma.bookingSession.deleteMany({ where: { tutorId: { in: tutorIds } } });
+      await prisma.orderAttachment.deleteMany({ where: { order: { items: { some: { service: { tutorId: { in: tutorIds } } } } } } });
+      await prisma.orderItem.deleteMany({ where: { service: { tutorId: { in: tutorIds } } } });
       await prisma.tutorService.deleteMany({ where: { tutorId: { in: tutorIds } } });
       await prisma.walletMutation.deleteMany({ where: { tutorId: { in: tutorIds } } });
       await prisma.platformRevenueLedger.deleteMany({ where: { tutorId: { in: tutorIds } } });
@@ -412,7 +420,7 @@ async function runSystemAudit() {
   });
   assert(true, 'Tutor profile verified by Admin (isVerified = true)');
 
-  logSub('2.3. Tutor sets weekly availability (Monday 15:30 - 17:00)');
+  logSub('2.3. Tutor sets weekly availability (Monday & Tuesday 15:30 - 17:00)');
   const availRes = await request('/api/v1/services/availability', {
     method: 'POST',
     token: tutorToken,
@@ -424,6 +432,17 @@ async function runSystemAudit() {
     expectedStatus: 201,
   });
   assert(availRes.body.data.dayOfWeek === 1 && availRes.body.data.startTime === '15:30', 'Availability slot Monday 15:30 - 17:00 established');
+
+  await request('/api/v1/services/availability', {
+    method: 'POST',
+    token: tutorToken,
+    body: {
+      dayOfWeek: 2,
+      startTime: '15:30',
+      endTime: '17:00',
+    },
+    expectedStatus: 201,
+  });
 
   logSub('2.4. Tutor publishes 2 services (SESSION_BASED & DELIVERABLE_BASED)');
   // Get categories

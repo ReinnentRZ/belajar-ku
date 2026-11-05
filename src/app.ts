@@ -26,21 +26,18 @@ export function buildApp(): FastifyInstance {
   app.register(cors, {
     origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
       'ngrok-skip-browser-warning',
-      'Ngrok-Skip-Browser-Warning',
       'Accept',
       'Origin',
       'X-Requested-With',
       'x-forwarded-for',
       'x-forwarded-host',
       'x-forwarded-proto',
-      'Access-Control-Request-Headers',
-      'Access-Control-Request-Method',
     ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   // JWT Plugin

@@ -31,12 +31,22 @@ export const api = axios.create({
 // Interceptor to inject JWT Bearer token and bypass Ngrok interstitial warning
 api.interceptors.request.use(
   (config) => {
-    // Add query parameter protection against Ngrok interstitial warning for GET / queries
+    // 1. Dual protection: Query parameter bypass for all HTTP methods (GET, POST, etc.)
     config.params = {
       ...config.params,
       'ngrok-skip-browser-warning': 'true',
     };
 
+    // 2. Dual protection: Explicit request header bypass
+    if (config.headers) {
+      if (typeof config.headers.set === 'function') {
+        config.headers.set('ngrok-skip-browser-warning', 'true');
+      } else {
+        config.headers['ngrok-skip-browser-warning'] = 'true';
+      }
+    }
+
+    // 3. Inject JWT Bearer token from localStorage on browser side
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       if (token && config.headers) {

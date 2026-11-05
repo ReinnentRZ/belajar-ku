@@ -23,51 +23,18 @@ export function buildApp(): FastifyInstance {
   });
 
   // Security & Cross-Origin
-  const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
-
   app.register(cors, {
-    origin: (origin, cb) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, internal server-to-server proxies)
-      if (!origin) {
-        cb(null, true);
-        return;
-      }
-
-      // Check against explicit configured CORS origins
-      if (allowedOrigins.includes(origin) || (env.FRONTEND_URL && origin.startsWith(env.FRONTEND_URL))) {
-        cb(null, true);
-        return;
-      }
-
-      // Allow localhost, 127.0.0.1, Cloudflare tunnels (*.trycloudflare.com), and Vercel deployments (*.vercel.app)
-      try {
-        const url = new URL(origin);
-        if (
-          url.hostname === 'localhost' ||
-          url.hostname === '127.0.0.1' ||
-          url.hostname.endsWith('.trycloudflare.com') ||
-          url.hostname.endsWith('.vercel.app')
-        ) {
-          cb(null, true);
-          return;
-        }
-      } catch {
-        // Fallback
-      }
-
-      // Dynamically allow origins to support arbitrary Cloudflare tunnel URLs seamlessly
-      cb(null, true);
-    },
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
-      'Authorization',
       'Content-Type',
+      'Authorization',
+      'ngrok-skip-browser-warning',
+      'Ngrok-Skip-Browser-Warning',
       'Accept',
       'Origin',
       'X-Requested-With',
-      'ngrok-skip-browser-warning',
-      'Ngrok-Skip-Browser-Warning',
       'x-forwarded-for',
       'x-forwarded-host',
       'x-forwarded-proto',

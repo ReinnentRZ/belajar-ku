@@ -23,13 +23,20 @@ export const api = axios.create({
   baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
   withCredentials: true,
 });
 
-// Interceptor to inject JWT Bearer token from localStorage
+// Interceptor to inject JWT Bearer token and bypass Ngrok interstitial warning
 api.interceptors.request.use(
   (config) => {
+    // Add query parameter protection against Ngrok interstitial warning for GET / queries
+    config.params = {
+      ...config.params,
+      'ngrok-skip-browser-warning': 'true',
+    };
+
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       if (token && config.headers) {
